@@ -1,35 +1,24 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-from typing import List
+from contextlib import asynccontextmanager
 
-from .database import get_db, engine, Base
-from . import models, schemas, crud
+from fastapi import FastAPI
 
-# Create tables (for dev only - use Alembic for prod)
-Base.metadata.create_all(bind=engine)
+from app.database import engine, Base
+from app.routers import users, documents, chat
 
-app = FastAPI(title="Second Brain AI Workspace")
 
-@app.get('/')
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Second Brain AI Workspace", lifespan=lifespan)
+
+app.include_router(users.router)
+app.include_router(documents.router)
+app.include_router(chat.router)
+
+
+@app.get("/")
 def root():
     return {"message": "Hello from Second Brain AI", "step": 2}
-
-# GET all users
-@app.get("/users/", response_model=List[schemas.UserResponse])
-def get_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud.get_users(db, skip=skip, limit=limit)
-
-# GET single user
-@app.get("/users/{user_id}", response_model=schemas.UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    return crud.get_user_by_id(db, user_id)
-
-# POST create user
-@app.post("/users/", response_model=schemas.UserResponse)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    return crud.create_user(db, user)
-
-# DELETE user
-@app.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    return crud.delete_user(db, user_id)
