@@ -43,7 +43,7 @@ async def file_input(file: UploadFile = File(...), user_id: int = Query(...), ch
         
         for page_num, page in enumerate(doc, start=1):
             # Use hybrid extraction: fitz first, OCR as fallback
-            text, method = extract_text_hybrid(page)
+            text, method = extract_text_hybrid(page, page_num=page_num)
             extraction_stats[method] += 1
             
             full_text += text
@@ -74,7 +74,8 @@ async def file_input(file: UploadFile = File(...), user_id: int = Query(...), ch
             chunks_count=chunks_count,
             status="embedded and stored",
             document_id=document.id,
-            chat_id=chat_id
+            chat_id=chat_id,
+            extraction_stats=extraction_stats
         )
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")

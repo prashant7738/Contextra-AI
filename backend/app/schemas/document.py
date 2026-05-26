@@ -14,3 +14,4 @@ class IngestionResponse(BaseModel):
     status: str
     document_id: int = None
     chat_id: int = None
+    extraction_stats: dict = None  # Shows {fitz: X, ocr: Y, failed: Z}
