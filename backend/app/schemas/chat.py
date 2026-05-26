@@ -17,6 +17,16 @@ class ChatResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ChatMessageResponse(BaseModel):
+    id: int
+    chat_id: int
+    user_message: str
+    bot_response: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class QueryRequest(BaseModel):
     chat_id: int
     request: str
@@ -24,3 +34,4 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str
+    conversation_history: Optional[list[ChatMessageResponse]] = None

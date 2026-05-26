@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.schemas.chat import ChatCreate, ChatResponse, QueryRequest, QueryResponse
+from app.schemas.chat import ChatCreate, ChatResponse, QueryRequest, QueryResponse, ChatMessageResponse
 from app.services.chat_service import (
     create_chat,
     list_user_chats,
@@ -11,6 +11,7 @@ from app.services.chat_service import (
     delete_chat,
 )
 from app.services.retrieval_service import answer_query
+from app.repositories import message_repository
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -82,7 +83,7 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
     Args:
         user_id: ID of the user asking the query
         query: Query containing chat_id and request
-        db: Database session (not used, but kept for consistency)
+        db: Database session
     """
     # Verify chat exists and belongs to user
     chat = get_chat(db, query.chat_id, user_id)
@@ -90,7 +91,19 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
     
     try:
-        answer = answer_query(query.request, user_id, query.chat_id)
-        return QueryResponse(answer=answer)
+        # Get previous chat history (last 10 messages)
+        chat_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
+        
+        # Answer query with chat history context
+        answer = answer_query(query.request, user_id, query.chat_id, chat_history=chat_history)
+        
+        # Save the message and response to history
+        saved_message = message_repository.save_message(db, query.chat_id, user_id, query.request, answer)
+        
+        # Get updated history to return
+        updated_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
+        history_responses = [ChatMessageResponse.model_validate(msg) for msg in updated_history]
+        
+        return QueryResponse(answer=answer, conversation_history=history_responses)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
