@@ -8,6 +8,7 @@ from app.routers import users, documents, chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("App Starting : Suiiiii")
     Base.metadata.create_all(bind=engine)
     yield
 

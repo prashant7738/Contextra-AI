@@ -11,13 +11,14 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("/ingest", response_model=IngestionResponse)
-async def file_input(file: UploadFile = File(...), user_id: int = Query(...), db: Session = Depends(get_db)):
+async def file_input(file: UploadFile = File(...), user_id: int = Query(...), chat_id: int = Query(...), db: Session = Depends(get_db)):
     """
-    Upload and ingest a PDF document.
+    Upload and ingest a PDF document into a specific chat.
     
     Args:
         file: PDF file to upload
         user_id: ID of the user uploading the document
+        chat_id: ID of the chat to attach the document to
         db: Database session
     """
     try:
@@ -37,15 +38,16 @@ async def file_input(file: UploadFile = File(...), user_id: int = Query(...), db
             })
         
         # Create document record in database
-        document = create_document(db, user_id, file.filename, full_text)
+        document = create_document(db, user_id, chat_id, file.filename, full_text)
         
-        # Ingest into vector database with user_id and document_id
-        chunks_count = ingest_text(pages_data, user_id=user_id, document_id=document.id)
+        # Ingest into vector database with user_id, document_id, and chat_id
+        chunks_count = ingest_text(pages_data, user_id=user_id, document_id=document.id, chat_id=chat_id)
         
         return IngestionResponse(
             chunks_count=chunks_count,
             status="embedded and stored",
-            document_id=document.id
+            document_id=document.id,
+            chat_id=chat_id
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -3,7 +3,7 @@ from app.core.embedder import embed_texts
 from app.repositories.vector_repository import store_embeddings
 
 
-def ingest_text(pages_data: list[dict], chunk_size: int = 100, user_id: int = None, document_id: int = None) -> int:
+def ingest_text(pages_data: list[dict], chunk_size: int = 100, user_id: int = None, document_id: int = None, chat_id: int = None) -> int:
     """
     Ingest document pages, chunk them, embed them, and store in vector DB.
     
@@ -12,6 +12,7 @@ def ingest_text(pages_data: list[dict], chunk_size: int = 100, user_id: int = No
         chunk_size: Size of chunks in words
         user_id: ID of the user uploading (stored in metadata)
         document_id: ID of the document (stored in metadata)
+        chat_id: ID of the chat this document belongs to (stored in metadata)
     
     Returns:
         Number of chunks created
@@ -22,6 +23,6 @@ def ingest_text(pages_data: list[dict], chunk_size: int = 100, user_id: int = No
     chunk_texts = [chunk["text"] for chunk in chunks]
     embeddings = embed_texts(chunk_texts)
     
-    # Pass full chunks with user/doc ID for metadata storage
-    store_embeddings(chunks, embeddings, user_id=user_id, document_id=document_id)
+    # Pass full chunks with user/doc/chat ID for metadata storage
+    store_embeddings(chunks, embeddings, user_id=user_id, document_id=document_id, chat_id=chat_id)
     return len(chunks)
