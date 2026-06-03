@@ -9,6 +9,8 @@ _chat_client: InferenceClient | None = None
 def get_llm() -> InferenceClient:
     global _chat_client
     if _chat_client is None:
+        if not settings.hf_token:
+            raise RuntimeError("Hugging Face API token not set. Set `HF_TOKEN` in environment or .env as `hf_token`.")
         _chat_client = InferenceClient(
             model="meta-llama/Llama-3.1-8B-Instruct",
             api_key=settings.hf_token,
