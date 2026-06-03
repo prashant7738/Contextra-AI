@@ -1,21 +1,17 @@
-from huggingface_hub import InferenceClient
+from sentence_transformers import SentenceTransformer
 
-from app.settings import settings
-
-
-_client: InferenceClient | None = None
+_model: SentenceTransformer | None = None
+_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 
-def get_embedder() -> InferenceClient:
-    global _client
-    if _client is None:
-        if not settings.hf_token:
-            raise RuntimeError("Hugging Face API token not set. Set `HF_TOKEN` in environment or .env as `hf_token`.")
-        _client = InferenceClient(provider="hf-inference", api_key=settings.hf_token)
-    return _client
+def get_embedder() -> SentenceTransformer:
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(_MODEL_NAME, device="cpu")
+    return _model
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    client = get_embedder()
-    result = client.feature_extraction(texts, model="BAAI/bge-base-en-v1.5")
-    return result if isinstance(result, list) else result.tolist()
+    model = get_embedder()
+    embeddings = model.encode(texts, normalize_embeddings=True)
+    return embeddings.tolist()
