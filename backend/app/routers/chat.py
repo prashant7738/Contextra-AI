@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.schemas.chat import ChatCreate, ChatResponse, QueryRequest, QueryResponse, ChatMessageResponse
+from app.schemas.chat import ChatCreate, ChatResponse, QueryRequest, QueryResponse, ChatMessageResponse, Reference
 from app.services.chat_service import (
     create_chat,
     list_user_chats,
@@ -95,7 +95,7 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
         chat_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
         
         # Answer query with chat history context
-        answer = answer_query(query.request, user_id, query.chat_id, chat_history=chat_history)
+        answer, references = answer_query(query.request, user_id, query.chat_id, chat_history=chat_history)
         
         # Save the message and response to history
         saved_message = message_repository.save_message(db, query.chat_id, user_id, query.request, answer)
@@ -104,6 +104,10 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
         updated_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
         history_responses = [ChatMessageResponse.model_validate(msg) for msg in updated_history]
         
-        return QueryResponse(answer=answer, conversation_history=history_responses)
+        return QueryResponse(
+            answer=answer,
+            references=[Reference(**ref) for ref in references],
+            conversation_history=history_responses,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")

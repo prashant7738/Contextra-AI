@@ -3,7 +3,7 @@ from app.core.llm import ask_llm
 from app.repositories.vector_repository import query_similar
 
 
-def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> str:
+def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> tuple[str, list[dict]]:
     """
     Answer a query within a specific chat context.
     
@@ -14,11 +14,24 @@ def answer_query(question: str, user_id: int, chat_id: int, chat_history: list =
         chat_history: Previous messages in the chat (optional, for context)
     
     Returns:
-        The LLM answer based on chat-specific context and history
+        Tuple of (answer, references) where references are the source chunks used
     """
     query_embedding = embed_texts([question])[0]
     results = query_similar(query_embedding, n_results=3, user_id=user_id, chat_id=chat_id)
     context = "\n".join(results["documents"][0])
+
+    # Extract references from metadata
+    references = []
+    seen = set()
+    for meta in results.get("metadatas", [[]])[0]:
+        key = (meta.get("filename", "unknown"), meta.get("page", 0))
+        if key not in seen:
+            seen.add(key)
+            references.append({
+                "filename": meta.get("filename", "unknown"),
+                "page": meta.get("page", 0),
+                "document_id": meta.get("document_id"),
+            })
     
     # Build conversation history context if available
     history_context = ""
@@ -31,4 +44,4 @@ def answer_query(question: str, user_id: int, chat_id: int, chat_history: list =
     
     # Combine contexts: history + document context
     full_context = context + history_context
-    return ask_llm(full_context, question)
+    return ask_llm(full_context, question), references

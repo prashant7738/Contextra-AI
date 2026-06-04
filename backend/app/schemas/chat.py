@@ -27,6 +27,12 @@ class ChatMessageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class Reference(BaseModel):
+    filename: str
+    page: int
+    document_id: Optional[int] = None
+
+
 class QueryRequest(BaseModel):
     chat_id: int
     request: str
@@ -34,4 +40,5 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str
+    references: list[Reference] = []
     conversation_history: Optional[list[ChatMessageResponse]] = None
