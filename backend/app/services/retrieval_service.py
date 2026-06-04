@@ -17,8 +17,8 @@ def answer_query(question: str, user_id: int, chat_id: int, chat_history: list =
         Tuple of (answer, references) where references are the source chunks used
     """
     query_embedding = embed_texts([question])[0]
-    results = query_similar(query_embedding, n_results=3, user_id=user_id, chat_id=chat_id)
-    context = "\n".join(results["documents"][0])
+    results = query_similar(query_embedding, n_results=10, user_id=user_id, chat_id=chat_id)
+    context = "\n\n".join(results["documents"][0])
 
     # Extract references from metadata
     references = []

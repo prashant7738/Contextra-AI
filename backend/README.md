@@ -277,13 +277,13 @@ Upload and ingest a PDF document into a specific chat.
 
 ```bash
 curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "file=@document.pdf"
+  -F "files=@document.pdf"
 ```
 
 **Parameters:**
 - `user_id` (query): ID of the user uploading the document
 - `chat_id` (query): ID of the chat to attach the document to
-- `file` (form-data): PDF file to upload
+- `files` (form-data): PDF file(s) to upload (repeat field for multiple files)
 
 **Response:**
 ```json
@@ -362,7 +362,7 @@ curl -X POST "http://localhost:8000/chats/?user_id=1" \
 ### Step 3: Upload Document
 ```bash
 curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "file=@ai_research.pdf"
+  -F "files=@ai_research.pdf"
 # Response: {"chunks_count": 42, "status": "embedded and stored", "document_id": 1, "chat_id": 1}
 ```
 
@@ -424,7 +424,7 @@ curl -X POST "http://localhost:8000/chats/?user_id=1" \
 **500 Internal Server Error - PDF processing failed:**
 ```bash
 curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "file=@invalid_file.txt"
+  -F "files=@invalid_file.txt"
 # Response: {"detail": "Error processing PDF: ..."}
 ```
 
