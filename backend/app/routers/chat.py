@@ -3,14 +3,23 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.schemas.chat import ChatCreate, ChatResponse, QueryRequest, QueryResponse, ChatMessageResponse, Reference
+from app.schemas.chat import (
+    ChatCreate,
+    ChatResponse,
+    QueryRequest,
+    QueryResponse,
+    ChatMessageResponse,
+    Reference,
+    DetailedSummaryRequest,
+    DetailedSummaryResponse,
+)
 from app.services.chat_service import (
     create_chat,
     list_user_chats,
     get_chat,
     delete_chat,
 )
-from app.services.retrieval_service import answer_query
+from app.services.retrieval_service import answer_query, generate_detailed_summary
 from app.repositories import message_repository
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -111,3 +120,37 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+
+
+@router.post("/detailed-summarizer", response_model=DetailedSummaryResponse)
+def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Session = Depends(get_db)):
+    """
+    Generate an 80/20 detailed study summary from uploaded notes in a chat.
+
+    Args:
+        user_id: ID of the user requesting summary
+        payload: Summary request with chat_id and topic_name
+        db: Database session
+    """
+    chat = get_chat(db, payload.chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    try:
+        summary, references, chunks_used = generate_detailed_summary(
+            topic_name=payload.topic_name,
+            user_id=user_id,
+            chat_id=payload.chat_id,
+            n_results=payload.n_results,
+            max_tokens=payload.max_tokens,
+        )
+        return DetailedSummaryResponse(
+            summary=summary,
+            topic=payload.topic_name,
+            references=[Reference(**ref) for ref in references],
+            chunks_used=chunks_used,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error generating summary: {str(exc)}")
