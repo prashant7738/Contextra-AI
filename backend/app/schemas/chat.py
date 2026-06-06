@@ -47,7 +47,7 @@ class QueryResponse(BaseModel):
 class DetailedSummaryRequest(BaseModel):
     chat_id: int
     topic_name: str = "all"
-    n_results: int = Field(default=20, ge=3, le=40)
+    n_results: int = Field(default=5, ge=3, le=40)
     max_tokens: int = Field(default=700, ge=200, le=1200)
 
     @field_validator("topic_name")

@@ -125,7 +125,7 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
 @router.post("/detailed-summarizer", response_model=DetailedSummaryResponse)
 def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Session = Depends(get_db)):
     """
-    Generate an 80/20 detailed study summary from uploaded notes in a chat.
+    Generate an detailed study summary using 80/20 rule from uploaded notes in a chat.
 
     Args:
         user_id: ID of the user requesting summary

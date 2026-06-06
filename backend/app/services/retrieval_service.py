@@ -39,11 +39,11 @@ def generate_detailed_summary(
     topic_name: str,
     user_id: int,
     chat_id: int,
-    n_results: int = 20,
+    n_results: int = 5,
     max_tokens: int = 700,
 ) -> tuple[str, list[dict], int]:
     """
-    Generate a detailed 80/20 study summary from chat-scoped uploaded notes.
+    Generate a detailed study summary from chat-scoped uploaded notes using 80-20 rule. i.e. give 20% information which covers 80% of the important topic 
 
     Args:
         topic_name: Topic to summarize or "all" for full notes
@@ -56,7 +56,7 @@ def generate_detailed_summary(
         Tuple of (summary, references, chunks_used)
 
     Raises:
-        ValueError: If no content is found for chat/topic
+        ValueError: If no exact content is found for chat/topic
     """
     normalized_topic = topic_name.strip()
     retrieval_query = (
@@ -71,11 +71,10 @@ def generate_detailed_summary(
     docs = results.get("documents", [[]])[0]
     if not docs:
         raise ValueError("No uploaded notes found in this chat")
-
-    if normalized_topic.lower() != "all":
-        topic_lower = normalized_topic.lower()
-        if not any(topic_lower in doc.lower() for doc in docs):
-            raise ValueError("Topic not found in uploaded notes for this chat")
+    
+    # Note: For topic searches beyond "all", the vector similarity search 
+    # already filtered for relevant documents. Removing strict substring 
+    # validation to handle typos and semantic variations.
 
     context = "\n\n".join(docs)
     references = _extract_references(results)
