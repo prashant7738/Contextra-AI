@@ -75,37 +75,30 @@ Context:
 
 def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
     """
-    Generate flashcards from context. Returns JSON with topics and their flashcard data.
+    Generate flashcards from context using a strict marker format.
     """
     client = get_llm()
-    prompt = f"""Generate flashcards for learning. Return ONLY valid JSON, nothing else.
+    prompt = f"""Generate learning flashcards from the content below.
 
-CRITICAL: Your entire response must be ONLY the JSON object, starting with {{ and ending with }}. No text before or after.
+Output constraints (strict):
+- Do NOT return JSON.
+- Return only repeated blocks in this exact structure:
+
+<<<FLASHCARD>>>
+TOPIC: <topic name>
+SUMMARY: <one short line, max 15 words>
+EXPLANATION: <2-4 sentence detailed explanation>
+<<<END>>>
 
 Rules:
-1. Identify ALL major topics and subtopics
-2. Important/large topics: 8-12 flashcards
-3. Medium topics: 4-7 flashcards
-4. Small topics: 2-3 flashcards
+1. Cover all major topics and subtopics from the content.
+2. Important/large topics should have more flashcards than minor topics.
+3. Every block must contain TOPIC, SUMMARY, and EXPLANATION.
+4. No extra text outside the blocks.
 
-Each flashcard:
-- topic: exact topic name (string)
-- summary: ONE short sentence, max 15 words (string)
-- explanation: detailed explanation, 2-3 sentences (string)
-
-JSON format (ONLY this, nothing else):
-{{
-  "flashcards": [
-    {{
-      "topic": "topic name",
-      "summary": "short summary",
-      "explanation": "detailed explanation"
-    }}
-  ]
-}}
-
-Content to extract from:
-{context}"""
+Content:
+{context}
+"""
     response = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
