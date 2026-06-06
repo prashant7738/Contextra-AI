@@ -41,9 +41,11 @@ def generate_detailed_summary(
     chat_id: int,
     n_results: int = 5,
     max_tokens: int = 700,
+    pre_generated_answer: str = None,
 ) -> tuple[str, list[dict], int]:
     """
-    Generate a detailed study summary from chat-scoped uploaded notes using 80-20 rule. i.e. give 20% information which covers 80% of the important topic 
+    Generate a detailed study summary from uploaded notes using 80-20 rule. i.e. give 20% information which covers 80% of the important topic.
+    Answer it in your own language even by adding more information you know.
 
     Args:
         topic_name: Topic to summarize or "all" for full notes
@@ -51,6 +53,7 @@ def generate_detailed_summary(
         chat_id: ID of the chat (for context filtering)
         n_results: Number of chunks to retrieve from vector store
         max_tokens: Max tokens for LLM output
+        pre_generated_answer: Optional LLM-generated answer from answer_query to use as base context
 
     Returns:
         Tuple of (summary, references, chunks_used)
@@ -78,7 +81,15 @@ def generate_detailed_summary(
 
     context = "\n\n".join(docs)
     references = _extract_references(results)
-    summary = ask_detailed_summary_llm(context, normalized_topic, max_tokens=max_tokens)
+    
+    # If a pre-generated answer exists, include it in the context
+    # This gives the LLM the initial query result to expand upon
+    if pre_generated_answer:
+        full_context = f"Initial Query Response:\n{pre_generated_answer}\n\n---\n\nSource Documents:\n{context}"
+    else:
+        full_context = context
+    
+    summary = ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
     return summary, references, len(docs)
 
 

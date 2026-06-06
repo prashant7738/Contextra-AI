@@ -126,6 +126,10 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db))
 def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Session = Depends(get_db)):
     """
     Generate an detailed study summary using 80/20 rule from uploaded notes in a chat.
+    
+    Flow:
+    1. First calls answer_query with topic_name to get LLM-enriched context
+    2. Then generates detailed summary with that context, allowing LLM to expand further
 
     Args:
         user_id: ID of the user requesting summary
@@ -137,12 +141,22 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
 
     try:
+        # Step 1: Query first to get LLM-enriched answer from docs
+        initial_answer, query_references = answer_query(
+            question=payload.topic_name,
+            user_id=user_id,
+            chat_id=payload.chat_id,
+            chat_history=None
+        )
+        
+        # Step 2: Generate detailed summary with pre-generated answer as context
         summary, references, chunks_used = generate_detailed_summary(
             topic_name=payload.topic_name,
             user_id=user_id,
             chat_id=payload.chat_id,
             n_results=payload.n_results,
             max_tokens=payload.max_tokens,
+            pre_generated_answer=initial_answer,
         )
         return DetailedSummaryResponse(
             summary=summary,
