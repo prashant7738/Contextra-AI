@@ -10,6 +10,9 @@ A FastAPI-based backend for a chat-scoped document retrieval system using RAG (R
 - **Vector Search**: Semantic search using embeddings (BAAI/bge-base-en-v1.5)
 - **Chat-Scoped Context**: AI agent only has access to documents within the current chat
 - **LLM Integration**: Uses Llama 3.1 8B for answer generation
+- **Conversation History**: Maintains chat history for context-aware responses
+- **Detailed Summarization**: Generate concise study summaries using 80/20 Pareto principle
+- **Intelligent Flashcards**: Auto-generate flashcards with smart topic distribution for effective learning
 
 ## Setup
 
@@ -341,6 +344,109 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 
 ---
 
+### 12. Generate Detailed Study Summary
+
+#### POST `/chats/detailed-summarizer`
+Generate a detailed study summary using the 80/20 rule from uploaded documents in a chat.
+
+```bash
+curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat_id": 1,
+    "topic_name": "Machine Learning",
+    "n_results": 5,
+    "max_tokens": 2000
+  }'
+```
+
+**Parameters:**
+- `user_id` (query): ID of the user requesting the summary
+- `chat_id` (body): ID of the chat to summarize
+- `topic_name` (body): Topic to summarize (use "all" or leave empty for full context summary)
+- `n_results` (body): Number of relevant chunks to retrieve (optional)
+- `max_tokens` (body): Maximum tokens for the response (optional)
+
+**Response:**
+```json
+{
+  "summary": "Machine Learning is a subset of AI that enables systems to learn and improve from experience... [Detailed 80/20 summary]",
+  "topic": "Machine Learning",
+  "references": [
+    {
+      "page": 1,
+      "document_id": 1,
+      "document_name": "ai_book.pdf"
+    }
+  ],
+  "chunks_used": 15
+}
+```
+
+**How it works:**
+1. Verifies chat ownership
+2. If topic is specific, first retrieves LLM-enriched context via query
+3. Generates a concise summary following the 80/20 Pareto principle (80% value in 20% content)
+4. Includes references to source documents and chunks used
+
+---
+
+### 13. Generate Flashcards
+
+#### POST `/chats/flashcard`
+Generate intelligent flashcards from all uploaded documents in a chat.
+
+```bash
+curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "n_results": 5,
+    "max_tokens": 1000
+  }'
+```
+
+**Parameters:**
+- `user_id` (query): ID of the user requesting flashcards
+- `chat_id` (query): ID of the chat to generate flashcards from
+- `n_results` (body, optional): Number of relevant chunks to retrieve for generation (default: 5)
+- `max_tokens` (body, optional): Maximum tokens for generation (default: 1000)
+
+**Response:**
+```json
+{
+  "flashcards": [
+    {
+      "topic": "Machine Learning Basics",
+      "summary": "ML is a subset of AI that enables systems to learn from data",
+      "explanation": "Machine Learning is a branch of Artificial Intelligence that focuses on enabling computer systems to automatically learn and improve from experience without being explicitly programmed. It uses algorithms to find patterns in data and make predictions or decisions based on those patterns.",
+      "references": [
+        {
+          "page": 5,
+          "document_id": 1,
+          "document_name": "ai_book.pdf"
+        }
+      ]
+    },
+    {
+      "topic": "Neural Networks",
+      "summary": "Neural networks mimic biological neurons to process information",
+      "explanation": "...",
+      "references": [...]
+    }
+  ],
+  "total_topics": 8,
+  "total_flashcards": 32
+}
+```
+
+**Flashcard Generation Features:**
+- **Smart Distribution**: Automatically creates more flashcards for important topics (8-12), medium topics (4-7), and basic topics (2-3)
+- **Comprehensive Content**: Each flashcard includes topic name, one-line summary, and detailed explanation
+- **Source Tracking**: References to source documents for each flashcard
+- **Full Context**: Always uses ALL uploaded documents in the chat (no topic filtering)
+
+---
+
 ## Complete Workflow Example
 
 ### Step 1: Create User
@@ -374,6 +480,22 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 # Response: {"answer": "Based on the document, the key findings are..."}
 ```
 
+### Step 5: Generate Detailed Summary (Optional)
+```bash
+curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": 1, "topic_name": "AI Research", "n_results": 5, "max_tokens": 2000}'
+# Response: {"summary": "AI Research is...", "topic": "AI Research", "references": [...], "chunks_used": 15}
+```
+
+### Step 6: Generate Flashcards (Optional)
+```bash
+curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
+  -H "Content-Type: application/json" \
+  -d '{"n_results": 5, "max_tokens": 1000}'
+# Response: {"flashcards": [...], "total_topics": 8, "total_flashcards": 32}
+```
+
 ---
 
 ## Architecture Overview
@@ -384,11 +506,17 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 1. PDF Upload
    └─> Extract text → Chunk text → Embed chunks → Store (DB + Vector DB)
 
-2. Query
-   └─> Embed query → Find similar chunks (Top-K) → Pass to LLM → Return answer
+2. Query & Chat
+   └─> Embed query → Find similar chunks (Top-K) → Pass to LLM with history → Return answer + references
 
-3. Isolation
-   └─> Each chat scoped by chat_id → User can only access their chats
+3. Detailed Summarization
+   └─> Retrieve topic-specific context → Generate 80/20 summary → Return with references
+
+4. Flashcard Generation
+   └─> Retrieve all context → Intelligent topic extraction → Generate flashcards with explanations → Return organized set
+
+5. Isolation
+   └─> Each chat scoped by chat_id → User can only access their chats → All operations verify ownership
 ```
 
 ### Technology Stack
