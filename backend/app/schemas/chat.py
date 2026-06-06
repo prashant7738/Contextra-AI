@@ -64,3 +64,21 @@ class DetailedSummaryResponse(BaseModel):
     topic: str
     references: list[Reference] = []
     chunks_used: int
+
+
+class Flashcard(BaseModel):
+    topic: str
+    summary: str
+    explanation: str
+    references: list[Reference] = []
+
+
+class FlashcardRequest(BaseModel):
+    n_results: int = Field(default=5, ge=3, le=40)
+    max_tokens: int = Field(default=1000, ge=500, le=2000)
+
+
+class FlashcardResponse(BaseModel):
+    flashcards: list[Flashcard]
+    total_topics: int
+    total_flashcards: int

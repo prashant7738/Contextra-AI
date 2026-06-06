@@ -1,6 +1,7 @@
 from app.core.embedder import embed_texts
-from app.core.llm import ask_detailed_summary_llm, ask_llm
+from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm
 from app.repositories.vector_repository import query_similar
+import json
 
 
 def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> tuple[str, list[dict]]:
@@ -109,3 +110,89 @@ def _extract_references(results: dict) -> list[dict]:
             }
         )
     return references
+
+
+def generate_flashcards(
+    user_id: int,
+    chat_id: int,
+    n_results: int = 5,
+    max_tokens: int = 1000,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Generate multiple flashcards from all uploaded notes using smart distribution.
+    
+    Args:
+        user_id: ID of the user (for access control)
+        chat_id: ID of the chat (for context filtering)
+        n_results: Number of chunks to retrieve from vector store
+        max_tokens: Max tokens for LLM output
+    
+    Returns:
+        Tuple of (flashcards, references) where:
+        - flashcards: List of dicts with topic, summary, explanation
+        - references: List of unique document references used
+    
+    Raises:
+        ValueError: If no content found or JSON parsing fails
+    """
+    # Step 1: Get all content from the chat
+    retrieval_query = "Provide a high-yield summary of these study notes"
+    query_embedding = embed_texts([retrieval_query])[0]
+    results = query_similar(query_embedding, n_results=n_results, user_id=user_id, chat_id=chat_id)
+    
+    docs = results.get("documents", [[]])[0]
+    if not docs:
+        raise ValueError("No uploaded notes found in this chat")
+    
+    context = "\n\n".join(docs)
+    references = _extract_references(results)
+    
+    # Step 2: Generate flashcards using LLM
+    flashcards_json = generate_flashcards_llm(context, max_tokens=max_tokens)
+    
+    # Step 3: Parse JSON response with robust error handling
+    try:
+        # Find JSON object boundaries
+        json_start = flashcards_json.find('{')
+        json_end = flashcards_json.rfind('}') + 1
+        
+        if json_start < 0 or json_end <= json_start:
+            raise ValueError("No JSON object found in response")
+        
+        json_str = flashcards_json[json_start:json_end].strip()
+        
+        # Try parsing
+        parsed = json.loads(json_str)
+        flashcards = parsed.get("flashcards", [])
+        
+        if not flashcards:
+            raise ValueError("No flashcards found in parsed JSON")
+        
+        # Validate and clean flashcard data
+        cleaned_flashcards = []
+        for fc in flashcards:
+            if not isinstance(fc, dict):
+                continue
+            
+            # Ensure required fields exist
+            if not fc.get("topic") or not fc.get("summary") or not fc.get("explanation"):
+                continue
+            
+            cleaned_flashcards.append({
+                "topic": str(fc.get("topic", "")).strip(),
+                "summary": str(fc.get("summary", "")).strip(),
+                "explanation": str(fc.get("explanation", "")).strip(),
+                "references": references,
+            })
+        
+        if not cleaned_flashcards:
+            raise ValueError("No valid flashcards after validation")
+        
+        return cleaned_flashcards, references
+    
+    except json.JSONDecodeError as e:
+        # Log more details for debugging
+        raise ValueError(
+            f"Failed to parse flashcard JSON (at position {e.pos}): {str(e)}\n"
+            f"Response preview: {flashcards_json[:500]}..."
+        )

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.database import get_db
 from app.schemas.chat import (
@@ -12,6 +12,9 @@ from app.schemas.chat import (
     Reference,
     DetailedSummaryRequest,
     DetailedSummaryResponse,
+    FlashcardRequest,
+    FlashcardResponse,
+    Flashcard,
 )
 from app.services.chat_service import (
     create_chat,
@@ -19,7 +22,7 @@ from app.services.chat_service import (
     get_chat,
     delete_chat,
 )
-from app.services.retrieval_service import answer_query, generate_detailed_summary
+from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards
 from app.repositories import message_repository
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -128,8 +131,10 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
     Generate an detailed study summary using 80/20 rule from uploaded notes in a chat.
     
     Flow:
-    1. First calls answer_query with topic_name to get LLM-enriched context
-    2. Then generates detailed summary with that context, allowing LLM to expand further
+    - If topic_name is "all" or empty: directly generate summary with full context
+    - If topic_name is specific: 
+      1. First call answer_query with topic_name to get LLM-enriched context
+      2. Then generate detailed summary with that context, allowing LLM to expand further
 
     Args:
         user_id: ID of the user requesting summary
@@ -141,17 +146,21 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
 
     try:
-        # Step 1: Query first to get LLM-enriched answer from docs
-        initial_answer, query_references = answer_query(
-            question=payload.topic_name,
-            user_id=user_id,
-            chat_id=payload.chat_id,
-            chat_history=None
-        )
+        normalized_topic = payload.topic_name.strip().lower() if payload.topic_name else ""
+        initial_answer = None
         
-        # Step 2: Generate detailed summary with pre-generated answer as context
+        # Only call answer_query for specific topics, not for "all"
+        if normalized_topic and normalized_topic != "all":
+            initial_answer, _ = answer_query(
+                question=payload.topic_name,
+                user_id=user_id,
+                chat_id=payload.chat_id,
+                chat_history=None
+            )
+        
+        # Generate detailed summary with optional pre-generated answer as context
         summary, references, chunks_used = generate_detailed_summary(
-            topic_name=payload.topic_name,
+            topic_name=payload.topic_name or "all",
             user_id=user_id,
             chat_id=payload.chat_id,
             n_results=payload.n_results,
@@ -160,7 +169,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         )
         return DetailedSummaryResponse(
             summary=summary,
-            topic=payload.topic_name,
+            topic=payload.topic_name or "all",
             references=[Reference(**ref) for ref in references],
             chunks_used=chunks_used,
         )
@@ -168,3 +177,68 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error generating summary: {str(exc)}")
+
+
+@router.post("/flashcard", response_model=FlashcardResponse)
+def generate_flashcard(user_id: int, chat_id: int, payload: Optional[FlashcardRequest] = None, db: Session = Depends(get_db)):
+    """
+    Generate flashcards from all uploaded notes in a chat.
+    
+    Flashcard generation:
+    - Always uses ALL context (no topic filtering)
+    - Creates intelligent distribution of flashcards:
+      * Important/large topics: 8-12 flashcards
+      * Medium topics: 4-7 flashcards
+      * Small/basic topics: 2-3 flashcards
+    - Each flashcard has: topic, summary (one line), detailed explanation
+    - Includes references to source documents
+
+    Args:
+        user_id: ID of the user requesting flashcards (query param)
+        chat_id: ID of the chat (query param)
+        payload: Optional flashcard request with n_results/max_tokens (defaults if not provided)
+        db: Database session
+    
+    Returns:
+        FlashcardResponse with list of flashcards and metadata
+    """
+    chat = get_chat(db, chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    try:
+        # Use defaults if payload not provided
+        n_results = payload.n_results if payload else 5
+        max_tokens = payload.max_tokens if payload else 1000
+        
+        flashcards, references = generate_flashcards(
+            user_id=user_id,
+            chat_id=chat_id,
+            n_results=n_results,
+            max_tokens=max_tokens,
+        )
+        
+        # Convert to Flashcard models
+        flashcard_models = [
+            Flashcard(
+                topic=fc.get("topic", "Unknown"),
+                summary=fc.get("summary", ""),
+                explanation=fc.get("explanation", ""),
+                references=[Reference(**ref) for ref in fc.get("references", [])],
+            )
+            for fc in flashcards
+        ]
+        
+        # Count unique topics
+        unique_topics = len(set(fc.topic for fc in flashcard_models))
+        
+        return FlashcardResponse(
+            flashcards=flashcard_models,
+            total_topics=unique_topics,
+            total_flashcards=len(flashcard_models),
+        )
+    
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(exc)}")
