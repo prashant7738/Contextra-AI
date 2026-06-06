@@ -1,0 +1,550 @@
+---
+import '../styles/global.css';
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Minimal chat workspace for Contextra AI." />
+    <title>Contextra AI</title>
+  </head>
+  <body>
+    <main class="app-shell" data-api-base={apiBase}>
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+
+      <section class="frame">
+        <aside class="sidebar panel">
+          <div class="brand-block">
+            <p class="eyebrow">Contextra AI</p>
+            <h1>Quiet chat workspace</h1>
+            <p class="lede">Create a user, open a chat, upload PDFs, and talk to the backend in one place.</p>
+          </div>
+
+          <form id="user-form" class="stack">
+            <label class="field">
+              <span>New user</span>
+              <input id="user-name" name="user-name" type="text" placeholder="Ava Stone" autocomplete="off" />
+            </label>
+            <button class="button button-primary" type="submit">Create user</button>
+          </form>
+
+          <div class="stack">
+            <div class="section-head">
+              <h2>Users</h2>
+              <button id="refresh-users" class="button button-ghost" type="button">Refresh</button>
+            </div>
+            <div id="user-list" class="choice-list"></div>
+          </div>
+
+          <div class="stack">
+            <div class="section-head">
+              <h2>Chats</h2>
+              <button id="refresh-chats" class="button button-ghost" type="button">Refresh</button>
+            </div>
+            <form id="chat-form" class="row-form">
+              <input id="chat-name" type="text" placeholder="New study thread" autocomplete="off" />
+              <button class="button button-primary" type="submit">New</button>
+            </form>
+            <div id="chat-list" class="chat-list"></div>
+          </div>
+
+          <div class="stack">
+            <div class="section-head">
+              <h2>Upload PDFs</h2>
+              <span class="muted">To the active chat</span>
+            </div>
+            <form id="upload-form" class="upload-card">
+              <label for="file-input" class="dropzone">
+                <strong>Drop files here</strong>
+                <span>or choose PDFs from your device</span>
+              </label>
+              <input id="file-input" type="file" accept="application/pdf" multiple />
+              <button class="button button-primary" type="submit">Send files</button>
+            </form>
+            <div id="upload-status" class="status-line"></div>
+          </div>
+        </aside>
+
+        <section class="workspace panel">
+          <header class="workspace-head">
+            <div>
+              <p class="eyebrow">Live backend connection</p>
+              <h2 id="chat-title">Select a user and chat</h2>
+            </div>
+            <div class="pills">
+              <span id="identity-pill" class="pill">No user selected</span>
+              <span id="connection-pill" class="pill pill-soft">Waiting</span>
+            </div>
+          </header>
+
+          <div id="message-stream" class="message-stream" aria-live="polite"></div>
+
+          <form id="message-form" class="composer">
+            <textarea id="message-input" rows="3" placeholder="Write a message for the selected chat..."></textarea>
+            <div class="composer-bar">
+              <p class="muted">Enter sends, Shift+Enter adds a new line.</p>
+              <button id="send-button" class="button button-primary" type="submit">Send</button>
+            </div>
+          </form>
+
+          <div id="app-status" class="status-line"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" define:vars={{ apiBase }}>
+      const API_BASE = apiBase;
+      const STORAGE_KEYS = {
+        userId: 'contextra-user-id',
+        chatId: 'contextra-chat-id',
+      };
+
+      const state = {
+        users: [],
+        chats: [],
+        messages: [],
+        userId: readStoredId(STORAGE_KEYS.userId),
+        chatId: readStoredId(STORAGE_KEYS.chatId),
+      };
+
+      const els = {
+        userForm: document.getElementById('user-form'),
+        userName: document.getElementById('user-name'),
+        userList: document.getElementById('user-list'),
+        refreshUsers: document.getElementById('refresh-users'),
+        chatForm: document.getElementById('chat-form'),
+        chatName: document.getElementById('chat-name'),
+        chatList: document.getElementById('chat-list'),
+        refreshChats: document.getElementById('refresh-chats'),
+        uploadForm: document.getElementById('upload-form'),
+        fileInput: document.getElementById('file-input'),
+        uploadStatus: document.getElementById('upload-status'),
+        chatTitle: document.getElementById('chat-title'),
+        identityPill: document.getElementById('identity-pill'),
+        connectionPill: document.getElementById('connection-pill'),
+        messageStream: document.getElementById('message-stream'),
+        messageForm: document.getElementById('message-form'),
+        messageInput: document.getElementById('message-input'),
+        sendButton: document.getElementById('send-button'),
+        appStatus: document.getElementById('app-status'),
+      };
+
+      bindEvents();
+      bootstrap().catch((error) => {
+        setStatus(error.message || 'Failed to start the chat workspace.', 'error');
+        setConnection('Disconnected', 'danger');
+      });
+
+      function readStoredId(key) {
+        const value = window.localStorage.getItem(key);
+        return value ? Number(value) : null;
+      }
+
+      function storeId(key, value) {
+        if (value == null) {
+          window.localStorage.removeItem(key);
+          return;
+        }
+        window.localStorage.setItem(key, String(value));
+      }
+
+      function bindEvents() {
+        els.userForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await createUser();
+        });
+
+        els.refreshUsers.addEventListener('click', () => loadUsers());
+        els.refreshChats.addEventListener('click', () => loadChats());
+
+        els.chatForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await createChat();
+        });
+
+        els.uploadForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await uploadFiles();
+        });
+
+        els.messageForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await sendMessage();
+        });
+
+        els.messageInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            els.messageForm.requestSubmit();
+          }
+        });
+
+        els.fileInput.addEventListener('change', () => {
+          const names = Array.from(els.fileInput.files || []).map((file) => file.name);
+          els.uploadStatus.textContent = names.length ? `Selected ${names.length} file${names.length > 1 ? 's' : ''}: ${names.join(', ')}` : '';
+        });
+      }
+
+      async function bootstrap() {
+        setConnection('Connecting', 'warning');
+        await loadUsers();
+        if (state.userId) {
+          await hydrateCurrentUser();
+        } else {
+          setConnection('Waiting for a user', 'muted');
+        }
+      }
+
+      async function hydrateCurrentUser() {
+        const user = state.users.find((entry) => entry.id === state.userId);
+        if (!user) {
+          state.userId = null;
+          storeId(STORAGE_KEYS.userId, null);
+          renderUsers();
+          renderWorkspace();
+          return;
+        }
+
+        els.identityPill.textContent = `User ${user.name} (#${user.id})`;
+        await loadChats();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          headers: {
+            ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+            ...(options.headers || {}),
+          },
+          ...options,
+        });
+
+        if (!response.ok) {
+          let detail = `${response.status} ${response.statusText}`;
+          try {
+            const error = await response.json();
+            detail = error.detail || error.message || detail;
+          } catch {
+            // Use the default status text when the server body is not JSON.
+          }
+          throw new Error(detail);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return response.json();
+        }
+        return response.text();
+      }
+
+      async function loadUsers() {
+        try {
+          state.users = await api('/users/');
+          renderUsers();
+          setConnection('Connected', 'success');
+        } catch (error) {
+          setStatus(`Users could not be loaded: ${error.message}`, 'error');
+          setConnection('Offline', 'danger');
+        }
+      }
+
+      async function createUser() {
+        const name = els.userName.value.trim();
+        if (!name) {
+          setStatus('Enter a user name first.', 'warning');
+          return;
+        }
+
+        try {
+          const user = await api('/users/', {
+            method: 'POST',
+            body: JSON.stringify({ name }),
+          });
+
+          els.userName.value = '';
+          setStatus(`Created user ${user.name}.`, 'success');
+          await loadUsers();
+          selectUser(user.id);
+        } catch (error) {
+          setStatus(`User creation failed: ${error.message}`, 'error');
+        }
+      }
+
+      function renderUsers() {
+        if (!state.users.length) {
+          els.userList.innerHTML = '<p class="empty">No users yet. Create one to start chatting.</p>';
+          return;
+        }
+
+        els.userList.innerHTML = state.users
+          .map((user) => `
+            <button class="choice ${user.id === state.userId ? 'choice-active' : ''}" data-user-id="${user.id}" type="button">
+              <span>${escapeHtml(user.name)}</span>
+              <small>#${user.id}</small>
+            </button>
+          `)
+          .join('');
+
+        els.userList.querySelectorAll('[data-user-id]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const userId = Number(button.dataset.userId);
+            await selectUser(userId);
+          });
+        });
+      }
+
+      async function selectUser(userId) {
+        state.userId = userId;
+        state.chatId = null;
+        storeId(STORAGE_KEYS.userId, userId);
+        storeId(STORAGE_KEYS.chatId, null);
+        renderUsers();
+        renderWorkspace();
+        await loadChats();
+      }
+
+      async function loadChats() {
+        if (!state.userId) {
+          state.chats = [];
+          renderChats();
+          renderWorkspace();
+          return;
+        }
+
+        try {
+          state.chats = await api(`/chats/?user_id=${state.userId}`);
+          renderChats();
+          if (state.chatId && state.chats.some((chat) => chat.id === state.chatId)) {
+            await selectChat(state.chatId, { skipRender: true });
+          } else if (state.chats.length) {
+            await selectChat(state.chats[0].id, { skipRender: true });
+          } else {
+            state.chatId = null;
+            storeId(STORAGE_KEYS.chatId, null);
+            state.messages = [];
+            renderWorkspace();
+          }
+        } catch (error) {
+          setStatus(`Chats could not be loaded: ${error.message}`, 'error');
+        }
+      }
+
+      function renderChats() {
+        if (!state.userId) {
+          els.chatList.innerHTML = '<p class="empty">Select a user to see chats.</p>';
+          return;
+        }
+
+        if (!state.chats.length) {
+          els.chatList.innerHTML = '<p class="empty">No chats yet. Create one above.</p>';
+          return;
+        }
+
+        els.chatList.innerHTML = state.chats
+          .map((chat) => `
+            <button class="chat-item ${chat.id === state.chatId ? 'chat-item-active' : ''}" data-chat-id="${chat.id}" type="button">
+              <span>${escapeHtml(chat.name)}</span>
+              <small>#${chat.id}</small>
+            </button>
+          `)
+          .join('');
+
+        els.chatList.querySelectorAll('[data-chat-id]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const chatId = Number(button.dataset.chatId);
+            await selectChat(chatId);
+          });
+        });
+      }
+
+      async function createChat() {
+        if (!state.userId) {
+          setStatus('Create or select a user first.', 'warning');
+          return;
+        }
+
+        const name = els.chatName.value.trim();
+        if (!name) {
+          setStatus('Enter a chat name first.', 'warning');
+          return;
+        }
+
+        try {
+          const chat = await api(`/chats/?user_id=${state.userId}`, {
+            method: 'POST',
+            body: JSON.stringify({ name }),
+          });
+
+          els.chatName.value = '';
+          setStatus(`Created chat ${chat.name}.`, 'success');
+          await loadChats();
+          await selectChat(chat.id);
+        } catch (error) {
+          setStatus(`Chat creation failed: ${error.message}`, 'error');
+        }
+      }
+
+      async function selectChat(chatId, options = {}) {
+        if (!state.userId) {
+          return;
+        }
+
+        state.chatId = chatId;
+        storeId(STORAGE_KEYS.chatId, chatId);
+        renderChats();
+        renderWorkspace();
+
+        try {
+          state.messages = await api(`/chats/${chatId}/messages?user_id=${state.userId}`);
+          renderMessages();
+          if (!options.skipRender) {
+            setStatus(`Loaded chat #${chatId}.`, 'success');
+          }
+        } catch (error) {
+          state.messages = [];
+          renderMessages();
+          setStatus(`Chat history could not be loaded: ${error.message}`, 'error');
+        }
+      }
+
+      async function uploadFiles() {
+        if (!state.userId || !state.chatId) {
+          setStatus('Choose a user and chat before uploading files.', 'warning');
+          return;
+        }
+
+        const files = Array.from(els.fileInput.files || []);
+        if (!files.length) {
+          setStatus('Choose at least one PDF.', 'warning');
+          return;
+        }
+
+        const data = new FormData();
+        for (const file of files) {
+          data.append('files', file);
+        }
+
+        try {
+          els.uploadStatus.textContent = 'Uploading files...';
+          const results = await api(`/documents/ingest?user_id=${state.userId}&chat_id=${state.chatId}`, {
+            method: 'POST',
+            body: data,
+          });
+
+          const summary = results
+            .map((item) => `${item.status} (${item.chunks_count} chunks)`)
+            .join(' · ');
+
+          els.fileInput.value = '';
+          els.uploadStatus.textContent = summary || 'Upload complete.';
+          setStatus('PDFs were sent to the backend.', 'success');
+        } catch (error) {
+          setStatus(`Upload failed: ${error.message}`, 'error');
+          els.uploadStatus.textContent = '';
+        }
+      }
+
+      async function sendMessage() {
+        if (!state.userId || !state.chatId) {
+          setStatus('Choose a user and chat before sending a message.', 'warning');
+          return;
+        }
+
+        const request = els.messageInput.value.trim();
+        if (!request) {
+          setStatus('Write a message first.', 'warning');
+          return;
+        }
+
+        els.sendButton.disabled = true;
+        setStatus('Sending message...', 'muted');
+
+        try {
+          const response = await api(`/chats/query?user_id=${state.userId}`, {
+            method: 'POST',
+            body: JSON.stringify({ chat_id: state.chatId, request }),
+          });
+
+          state.messages = response.conversation_history || state.messages;
+          renderMessages();
+          els.messageInput.value = '';
+          setStatus('Response received.', 'success');
+        } catch (error) {
+          setStatus(`Message failed: ${error.message}`, 'error');
+        } finally {
+          els.sendButton.disabled = false;
+        }
+      }
+
+      function renderMessages() {
+        if (!state.userId || !state.chatId) {
+          els.messageStream.innerHTML = `
+            <div class="empty-state">
+              <p class="eyebrow">No conversation open</p>
+              <h3>Pick a user and a chat on the left.</h3>
+            </div>
+          `;
+          return;
+        }
+
+        if (!state.messages.length) {
+          els.messageStream.innerHTML = `
+            <div class="empty-state">
+              <p class="eyebrow">Ready when you are</p>
+              <h3>This chat is empty.</h3>
+              <p>Upload a PDF, then ask something about it.</p>
+            </div>
+          `;
+          return;
+        }
+
+        els.messageStream.innerHTML = state.messages
+          .map(
+            (message) => `
+              <article class="turn">
+                <div class="bubble bubble-user">
+                  <span class="bubble-label">You</span>
+                  <p>${escapeHtml(message.user_message)}</p>
+                </div>
+                <div class="bubble bubble-bot">
+                  <span class="bubble-label">Assistant</span>
+                  <p>${escapeHtml(message.bot_response)}</p>
+                </div>
+              </article>
+            `,
+          )
+          .join('');
+      }
+
+      function renderWorkspace() {
+        const chat = state.chats.find((entry) => entry.id === state.chatId);
+        els.chatTitle.textContent = chat ? chat.name : state.userId ? 'Choose a chat' : 'Select a user and chat';
+        els.identityPill.textContent = state.userId ? `User #${state.userId}` : 'No user selected';
+        renderMessages();
+        renderChats();
+      }
+
+      function setStatus(message, tone = 'muted') {
+        els.appStatus.textContent = message;
+        els.appStatus.dataset.tone = tone;
+      }
+
+      function setConnection(message, tone = 'muted') {
+        els.connectionPill.textContent = message;
+        els.connectionPill.dataset.tone = tone;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+    </script>
+  </body>
+</html>

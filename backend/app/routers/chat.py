@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -26,6 +26,19 @@ from app.services.retrieval_service import answer_query, generate_detailed_summa
 from app.repositories import message_repository
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+@router.get("/{chat_id}/messages", response_model=List[ChatMessageResponse])
+def get_chat_messages(chat_id: int, user_id: int, limit: int = Query(default=50, ge=1, le=200), db: Session = Depends(get_db)):
+    """
+    Return the recent message history for a chat.
+    """
+    chat = get_chat(db, chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    messages = message_repository.get_chat_history(db, chat_id, user_id, limit=limit)
+    return [ChatMessageResponse.model_validate(message) for message in messages]
 
 
 @router.post("/", response_model=ChatResponse)
