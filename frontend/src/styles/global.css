@@ -62,7 +62,6 @@ button {
 .app-shell {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
   padding: 24px;
 }
 
@@ -96,6 +95,7 @@ button {
   grid-template-columns: minmax(290px, 370px) minmax(0, 1fr);
   gap: 18px;
   min-height: calc(100vh - 48px);
+  align-items: start;
 }
 
 .panel {
@@ -107,10 +107,15 @@ button {
 }
 
 .sidebar {
+  position: sticky;
+  top: 24px;
   display: flex;
   flex-direction: column;
   gap: 22px;
   padding: 24px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace {
@@ -118,6 +123,8 @@ button {
   flex-direction: column;
   gap: 20px;
   padding: 24px;
+  min-height: calc(100vh - 48px);
+  overflow: hidden;
 }
 
 .brand-block h1,
@@ -294,11 +301,6 @@ textarea {
   line-height: 1.6;
 }
 
-.upload-card {
-  display: grid;
-  gap: 12px;
-}
-
 .dropzone {
   display: grid;
   gap: 8px;
@@ -316,6 +318,26 @@ textarea {
 
 .dropzone span {
   color: var(--muted);
+}
+
+.composer-upload {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.upload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.composer-upload .dropzone {
+  min-height: 100%;
 }
 
 #file-input {
@@ -576,6 +598,12 @@ textarea {
   .frame {
     grid-template-columns: 1fr;
   }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 720px) {
@@ -602,6 +630,10 @@ textarea {
   }
 
   .summary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-row {
     grid-template-columns: 1fr;
   }
 
