@@ -11,7 +11,8 @@
   "dependencies": {
     "@fontsource/fraunces": "^5.2.6",
     "@fontsource/ibm-plex-sans": "^5.2.6",
-    "astro": "^5.8.2"
+    "astro": "^5.8.2",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.16.5",

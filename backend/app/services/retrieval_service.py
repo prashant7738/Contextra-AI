@@ -91,8 +91,9 @@ def generate_detailed_summary(
     else:
         full_context = context
     
-    summary = ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
-    return summary, references, len(docs)
+    summary_output = ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
+    summary, title, sections = _parse_detailed_summary_output(summary_output, normalized_topic)
+    return summary, title, sections, references, len(docs)
 
 
 def _extract_references(results: dict) -> list[dict]:
@@ -111,6 +112,75 @@ def _extract_references(results: dict) -> list[dict]:
             }
         )
     return references
+
+
+def _parse_detailed_summary_output(output: str, topic_name: str) -> tuple[str, str, list[dict]]:
+    cleaned = output.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+
+    try:
+        data = json.loads(cleaned)
+        sections = []
+        for section in data.get("sections", []):
+            heading = str(section.get("heading", "")).strip()
+            items = [str(item).strip() for item in section.get("items", []) if str(item).strip()]
+            if heading and items:
+                sections.append({"heading": heading, "items": items})
+        title = str(data.get("title", "")).strip() or f"Detailed summary: {topic_name}"
+        summary = _format_detailed_summary_text(title, sections)
+        return summary, title, sections
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass
+
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    sections = []
+    current = None
+    title = f"Detailed summary: {topic_name}"
+
+    for line in lines:
+        line = line.replace("**", "")
+        line = re.sub(r"^\s{0,3}#{1,6}\s*", "", line)
+        heading_match = re.match(r"^(?:\d+[).]\s*)?([A-Za-z][A-Za-z0-9 /&-]+):?\s*$", line)
+        if heading_match and len(line) < 80:
+            heading = heading_match.group(1).strip()
+            current = {"heading": heading, "items": []}
+            sections.append(current)
+            if not title or title == f"Detailed summary: {topic_name}":
+                title = heading
+            continue
+
+        if re.match(r"^[\-*•]\s+", line):
+            item = re.sub(r"^[\-*•]\s+", "", line).strip()
+            if current is None:
+                current = {"heading": "Summary", "items": []}
+                sections.append(current)
+            current["items"].append(item)
+            continue
+
+        if current is None:
+            current = {"heading": "Summary", "items": []}
+            sections.append(current)
+        current["items"].append(line)
+
+    summary = _format_detailed_summary_text(title, sections)
+    return summary, title, sections
+
+
+def _format_detailed_summary_text(title: str, sections: list[dict]) -> str:
+    lines = [title]
+    for section in sections:
+        heading = section.get("heading", "").strip()
+        items = section.get("items", [])
+        if not heading:
+            continue
+        lines.append("")
+        lines.append(heading)
+        for item in items:
+            clean_item = str(item).strip()
+            if clean_item:
+                lines.append(f"- {clean_item}")
+    return "\n".join(lines).strip()
 
 
 def generate_flashcards(

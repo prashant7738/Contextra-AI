@@ -33,6 +33,11 @@ class Reference(BaseModel):
     document_id: Optional[int] = None
 
 
+class SummarySection(BaseModel):
+    heading: str
+    items: list[str] = []
+
+
 class QueryRequest(BaseModel):
     chat_id: int
     request: str
@@ -64,6 +69,8 @@ class DetailedSummaryResponse(BaseModel):
     topic: str
     references: list[Reference] = []
     chunks_used: int
+    title: Optional[str] = None
+    sections: list[SummarySection] = []
 
 
 class Flashcard(BaseModel):

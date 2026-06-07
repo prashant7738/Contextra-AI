@@ -54,13 +54,29 @@ Rules:
 - Keep it concise and easy for students to revise quickly.
 - Do not add information that is not present in the context.
 - If context is insufficient, explicitly mention the limitation.
+- Return valid JSON only.
+- Do not use markdown, code fences, or extra commentary.
 
 Topic requested: {topic_name}
 
 Output format:
-1) Core Concepts (short bullets)
-2) Must Remember (high-yield points)
-3) Quick Revision Checklist
+{{
+  "title": "Short summary title",
+  "sections": [
+    {{
+      "heading": "Core Concepts",
+      "items": ["point 1", "point 2"]
+    }},
+    {{
+      "heading": "Must Remember",
+      "items": ["point 1", "point 2"]
+    }},
+    {{
+      "heading": "Quick Revision Checklist",
+      "items": ["point 1", "point 2"]
+    }}
+  ]
+}}
 
 Context:
 {context}

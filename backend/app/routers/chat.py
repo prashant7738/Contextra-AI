@@ -172,7 +172,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
             )
         
         # Generate detailed summary with optional pre-generated answer as context
-        summary, references, chunks_used = generate_detailed_summary(
+        summary, title, sections, references, chunks_used = generate_detailed_summary(
             topic_name=payload.topic_name or "all",
             user_id=user_id,
             chat_id=payload.chat_id,
@@ -185,6 +185,8 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
             topic=payload.topic_name or "all",
             references=[Reference(**ref) for ref in references],
             chunks_used=chunks_used,
+            title=title,
+            sections=sections,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

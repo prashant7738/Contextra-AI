@@ -290,6 +290,55 @@
   margin-bottom: 0;
 }
 
+.cardContent h1,
+.cardContent h2,
+.cardContent h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 16px 0 8px;
+  font-size: 1rem;
+}
+
+.cardContent ul,
+.cardContent ol {
+  padding-left: 20px;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.cardContent li {
+  margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.cardContent strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cardContent em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.summarySection + .summarySection {
+  margin-top: 18px;
+}
+
+.sectionTitle {
+  font-family: 'Merriweather', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.sectionList {
+  margin: 0;
+  padding-left: 20px;
+}
+
 .cardFooter {
   margin-top: 20px;
   padding-top: 20px;

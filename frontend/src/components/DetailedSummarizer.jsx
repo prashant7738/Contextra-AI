@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import styles from './DetailedSummarizer.module.css';
 
 export default function DetailedSummarizer() {
@@ -64,7 +65,7 @@ export default function DetailedSummarizer() {
       }
 
       const data = await response.json();
-      setResults(data.results || []);
+      setResults([data]);
       setShowResults(true);
       setExpandedCards(new Set());
 
@@ -226,12 +227,25 @@ export default function DetailedSummarizer() {
                   </div>
 
                   <div className={styles.cardContent}>
-                    <p>{result.summary || result.content || 'No content available'}</p>
+                    {result.sections?.length ? (
+                      result.sections.map((section, sectionIdx) => (
+                        <div key={sectionIdx} className={styles.summarySection}>
+                          <h4 className={styles.sectionTitle}>{section.heading}</h4>
+                          <ul className={styles.sectionList}>
+                            {section.items?.map((item, itemIdx) => (
+                              <li key={itemIdx}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <ReactMarkdown>{result.summary || result.content || 'No content available'}</ReactMarkdown>
+                    )}
                   </div>
 
                   <div className={styles.cardFooter}>
                     <span className={styles.tokenUsage}>
-                      {result.tokens_used || '—'} tokens
+                      {result.chunks_used || result.tokens_used || '—'} chunks
                     </span>
                     <button
                       className={styles.expandBtn}
