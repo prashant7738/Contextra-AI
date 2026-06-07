@@ -191,6 +191,7 @@ button {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -203,6 +204,7 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   border-color: rgba(31, 61, 54, 0.45);
   box-shadow: 0 0 0 4px rgba(31, 61, 54, 0.08);
@@ -448,6 +450,103 @@ textarea {
   padding-top: 6px;
 }
 
+.summary-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  background:
+    linear-gradient(130deg, rgba(255, 255, 255, 0.92), rgba(246, 239, 229, 0.84)),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(31, 61, 54, 0.03),
+      rgba(31, 61, 54, 0.03) 9px,
+      rgba(31, 61, 54, 0.01) 9px,
+      rgba(31, 61, 54, 0.01) 18px
+    );
+}
+
+.summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summary-head h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.15rem, 1.8vw, 1.6rem);
+  letter-spacing: -0.02em;
+}
+
+.summary-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.summary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.summary-output {
+  display: grid;
+}
+
+.summary-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(31, 61, 54, 0.16);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.summary-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-body {
+  margin: 0;
+  line-height: 1.72;
+  color: #2a251f;
+}
+
+.summary-sources {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-sources h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.summary-sources ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.summary-sources li {
+  color: var(--text);
+}
+
+.summary-sources small {
+  color: var(--muted);
+}
+
 .composer-bar {
   display: flex;
   align-items: center;
@@ -490,10 +589,20 @@ textarea {
   }
 
   .workspace-head,
+  .summary-head,
+  .summary-controls,
   .composer-bar,
   .section-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .summary-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-actions {
+    grid-template-columns: 1fr;
   }
 
   .row-form {

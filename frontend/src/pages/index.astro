@@ -83,6 +83,41 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
           <div id="message-stream" class="message-stream" aria-live="polite"></div>
 
+          <section class="summary-panel" aria-live="polite">
+            <div class="summary-head">
+              <div>
+                <p class="eyebrow">Insight Layer</p>
+                <h3>Detailed summary</h3>
+              </div>
+              <span id="summary-chat-pill" class="pill">No chat selected</span>
+            </div>
+
+            <form id="summary-form" class="summary-controls">
+              <label class="field">
+                <span>Topic focus</span>
+                <input id="summary-topic" type="text" placeholder="all, chapter 3, architecture decisions..." autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Context chunks</span>
+                <select id="summary-results">
+                  <option value="3">3 chunks</option>
+                  <option value="5" selected>5 chunks</option>
+                  <option value="10">10 chunks</option>
+                  <option value="15">15 chunks</option>
+                </select>
+              </label>
+              <div class="summary-actions">
+                <button id="summary-generate" class="button button-primary" type="submit">Generate</button>
+                <button id="summary-clear" class="button button-ghost" type="button">Clear</button>
+              </div>
+            </form>
+
+            <p id="summary-status" class="status-line"></p>
+            <div id="summary-output" class="summary-output">
+              <p class="empty">Choose a chat and generate a focused summary.</p>
+            </div>
+          </section>
+
           <form id="message-form" class="composer">
             <textarea id="message-input" rows="3" placeholder="Write a message for the selected chat..."></textarea>
             <div class="composer-bar">
@@ -107,6 +142,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         users: [],
         chats: [],
         messages: [],
+        summariesByChat: {},
         userId: readStoredId(STORAGE_KEYS.userId),
         chatId: readStoredId(STORAGE_KEYS.chatId),
       };
@@ -127,6 +163,14 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         identityPill: document.getElementById('identity-pill'),
         connectionPill: document.getElementById('connection-pill'),
         messageStream: document.getElementById('message-stream'),
+        summaryForm: document.getElementById('summary-form'),
+        summaryTopic: document.getElementById('summary-topic'),
+        summaryResults: document.getElementById('summary-results'),
+        summaryGenerate: document.getElementById('summary-generate'),
+        summaryClear: document.getElementById('summary-clear'),
+        summaryStatus: document.getElementById('summary-status'),
+        summaryOutput: document.getElementById('summary-output'),
+        summaryChatPill: document.getElementById('summary-chat-pill'),
         messageForm: document.getElementById('message-form'),
         messageInput: document.getElementById('message-input'),
         sendButton: document.getElementById('send-button'),
@@ -174,6 +218,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         els.messageForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           await sendMessage();
+        });
+
+        els.summaryForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          await generateDetailedSummary();
+        });
+
+        els.summaryClear.addEventListener('click', () => {
+          clearDetailedSummary();
         });
 
         els.messageInput.addEventListener('keydown', (event) => {
@@ -299,6 +352,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
       async function selectUser(userId) {
         state.userId = userId;
         state.chatId = null;
+        state.summariesByChat = {};
         storeId(STORAGE_KEYS.userId, userId);
         storeId(STORAGE_KEYS.chatId, null);
         renderUsers();
@@ -479,6 +533,89 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         }
       }
 
+      async function generateDetailedSummary() {
+        if (!state.userId || !state.chatId) {
+          setSummaryStatus('Choose a user and chat before generating a summary.', 'warning');
+          return;
+        }
+
+        const topic = els.summaryTopic.value.trim() || 'all';
+        const nResults = Number(els.summaryResults.value) || 5;
+        els.summaryGenerate.disabled = true;
+        setSummaryStatus('Generating detailed summary...', 'muted');
+
+        try {
+          const summary = await api(`/chats/detailed-summarizer?user_id=${state.userId}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              chat_id: state.chatId,
+              topic_name: topic,
+              n_results: nResults,
+              max_tokens: 1200,
+            }),
+          });
+
+          state.summariesByChat[state.chatId] = summary;
+          renderSummary();
+          setSummaryStatus('Detailed summary ready.', 'success');
+        } catch (error) {
+          setSummaryStatus(`Summary failed: ${error.message}`, 'danger');
+        } finally {
+          els.summaryGenerate.disabled = false;
+        }
+      }
+
+      function clearDetailedSummary() {
+        if (state.chatId) {
+          delete state.summariesByChat[state.chatId];
+        }
+        els.summaryTopic.value = '';
+        renderSummary();
+        setSummaryStatus('Summary cleared for this chat.', 'muted');
+      }
+
+      function renderSummary() {
+        const chat = state.chats.find((entry) => entry.id === state.chatId);
+        els.summaryChatPill.textContent = chat ? `${chat.name} · #${chat.id}` : 'No chat selected';
+
+        if (!state.userId || !state.chatId) {
+          els.summaryOutput.innerHTML = '<p class="empty">Choose a chat and generate a focused summary.</p>';
+          return;
+        }
+
+        const summary = state.summariesByChat[state.chatId];
+        if (!summary) {
+          els.summaryOutput.innerHTML = '<p class="empty">No summary yet for this chat. Generate one to see distilled insights and references.</p>';
+          return;
+        }
+
+        const references = (summary.references || [])
+          .map((reference) => {
+            const page = Number(reference.page);
+            const pageLabel = Number.isFinite(page) ? `p.${page}` : 'page n/a';
+            return `<li>${escapeHtml(reference.filename || 'unknown.pdf')} <small>${pageLabel}</small></li>`;
+          })
+          .join('');
+
+        els.summaryOutput.innerHTML = `
+          <article class="summary-card">
+            <div class="summary-card-head">
+              <span class="pill pill-soft">Topic: ${escapeHtml(summary.topic || 'all')}</span>
+              <span class="pill">Chunks used: ${Number(summary.chunks_used) || 0}</span>
+            </div>
+            <p class="summary-body">${formatWithBreaks(summary.summary || 'No summary text returned.')}</p>
+            <div class="summary-sources">
+              <h4>References</h4>
+              ${
+                references
+                  ? `<ul>${references}</ul>`
+                  : '<p class="empty">No source references were returned for this summary.</p>'
+              }
+            </div>
+          </article>
+        `;
+      }
+
       function renderMessages() {
         if (!state.userId || !state.chatId) {
           els.messageStream.innerHTML = `
@@ -524,6 +661,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         els.chatTitle.textContent = chat ? chat.name : state.userId ? 'Choose a chat' : 'Select a user and chat';
         els.identityPill.textContent = state.userId ? `User #${state.userId}` : 'No user selected';
         renderMessages();
+        renderSummary();
         renderChats();
       }
 
@@ -544,6 +682,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
           .replaceAll('>', '&gt;')
           .replaceAll('"', '&quot;')
           .replaceAll("'", '&#39;');
+      }
+
+      function formatWithBreaks(value) {
+        return escapeHtml(value).replaceAll('\n', '<br />');
+      }
+
+      function setSummaryStatus(message, tone = 'muted') {
+        els.summaryStatus.textContent = message;
+        els.summaryStatus.dataset.tone = tone;
       }
     </script>
   </body>
