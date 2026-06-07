@@ -81,8 +81,6 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
             </div>
           </header>
 
-          <div id="message-stream" class="message-stream" aria-live="polite"></div>
-
           <section class="summary-panel" aria-live="polite">
             <div class="summary-head">
               <div>
@@ -117,6 +115,8 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
               <p class="empty">Choose a chat and generate a focused summary.</p>
             </div>
           </section>
+
+          <div id="message-stream" class="message-stream" aria-live="polite"></div>
 
           <form id="message-form" class="composer">
             <textarea id="message-input" rows="3" placeholder="Write a message for the selected chat..."></textarea>
