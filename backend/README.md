@@ -1,88 +1,13 @@
 # Contextra AI Backend
+## User Management
 
-A FastAPI-based backend for a chat-scoped document retrieval system using RAG (Retrieval-Augmented Generation).
+Public `/users` management endpoints have been removed. User creation and authentication continue to be handled by the `/auth` routes (login/refresh/me). Administrators can manage and inspect users via the admin endpoints:
 
-## Features
+- `GET /admin/users` — list all users (admin-only)
+- `GET /admin/users/{user_id}/chats` — list a user's chats (admin-only)
+- `GET /admin/chats/{chat_id}/messages` — view messages for a chat (admin-only)
 
-- **User Management**: Create and manage users
-- **Chat Sessions**: Each user can have multiple chats for different conversations
-- **Document Upload**: Upload PDF documents to specific chats
-- **Vector Search**: Semantic search using embeddings (BAAI/bge-base-en-v1.5)
-- **Chat-Scoped Context**: AI agent only has access to documents within the current chat
-- **LLM Integration**: Uses Llama 3.1 8B for answer generation
-- **Conversation History**: Maintains chat history for context-aware responses
-- **Detailed Summarization**: Generate concise study summaries using 80/20 Pareto principle
-- **Intelligent Flashcards**: Auto-generate flashcards with smart topic distribution for effective learning
-
-## Setup
-
-### Prerequisites
-- Python 3.12+
-- PostgreSQL
-- UV (Python package manager)
-
-### Installation
-
-```bash
-# Clone repository
-cd "/home/prashant/Coding/Projects/Projects_2/Contextra AI/backend"
-
-# Install dependencies
-uv sync
-
-# Create fresh database
-uv run python3 << 'EOF'
-from app.database import Base, engine
-Base.metadata.drop_all(bind=engine)
-Base.metadata.create_all(bind=engine)
-print("✓ Database created")
-EOF
-
-# Clear vector database (optional)
-rm -rf my_vector_db/
-```
-
-### Environment Variables
-
-Create a `.env` file in the backend directory:
-
-```
-DATABASE_URL=postgresql://user:password@localhost/contextra_ai_db
-HUGGINGFACE_API_KEY=your_hf_token_here
-CHROMA_PERSIST_DIR=./my_vector_db
-CHROMA_COLLECTION_NAME=knowledge-base
- 
-# Admin
-# Set the admin email that can access the admin panel endpoints
-ADMIN_EMAIL=admin@example.com
-```
-
-## Running the Server
-
-```bash
-uv run uvicorn app.main:app --reload
-```
-
-Server will start at: `http://localhost:8000`
-
-### API Documentation
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
----
-
-## API Endpoints
-
-### 1. Root Endpoint
-
-#### GET `/`
-Check if server is running.
-
-```bash
-curl http://localhost:8000/
-```
-
+Configure the admin account email using the `ADMIN_EMAIL` environment variable (see Environment Variables above).
 **Response:**
 ```json
 {
