@@ -89,9 +89,84 @@ curl http://localhost:8000/
 
 ---
 
+## Authentication Endpoints
+
+### 2. Register User
+
+#### POST `/auth/register`
+Register a user with name, email, and password.
+```bash
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "StrongPass123!"
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "token_type": "bearer",
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com"
+  }
+}
+```
+
+---
+
+### 3. Login
+
+#### POST `/auth/login`
+Login with email and password.
+
+```bash
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "StrongPass123!"
+  }'
+```
+
+---
+
+### 4. Refresh Access Token
+
+#### POST `/auth/refresh`
+Get a new access token using a refresh token.
+
+```bash
+curl -X POST "http://localhost:8000/auth/refresh" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh_token": "your_refresh_token"
+  }'
+```
+
+---
+
+### 5. Get Current User
+
+#### GET `/auth/me`
+Get currently authenticated user details.
+
+```bash
+curl "http://localhost:8000/auth/me" \
+  -H "Authorization: Bearer your_access_token"
+```
+
+---
+
 ## User Management Endpoints
 
-### 2. Create User
+### 6. Create User
 
 #### POST `/users/`
 Create a new user.
@@ -112,7 +187,7 @@ curl -X POST "http://localhost:8000/users/" \
 
 ---
 
-### 3. List All Users
+### 7. List All Users
 
 #### GET `/users/`
 Get all users with pagination.
@@ -137,7 +212,7 @@ curl "http://localhost:8000/users/?skip=0&limit=100"
 
 ---
 
-### 4. Get Specific User
+### 8. Get Specific User
 
 #### GET `/users/{user_id}`
 Get user details by ID.
@@ -156,7 +231,7 @@ curl "http://localhost:8000/users/1"
 
 ---
 
-### 5. Delete User
+### 9. Delete User
 
 #### DELETE `/users/{user_id}`
 Delete a user by ID.
@@ -176,7 +251,22 @@ curl -X DELETE "http://localhost:8000/users/1"
 
 ## Chat Management Endpoints
 
-### 6. Create Chat
+### 10. Get Chat Messages
+
+#### GET `/chats/{chat_id}/messages`
+Get recent conversation history for a chat.
+
+```bash
+curl "http://localhost:8000/chats/1/messages?user_id=1&limit=50"
+```
+
+**Parameters:**
+- `user_id` (query): ID of the chat owner
+- `limit` (query, optional): Number of recent messages to return (1-200, default: 50)
+
+---
+
+### 11. Create Chat
 
 #### POST `/chats/`
 Create a new chat for a user.
@@ -200,7 +290,7 @@ curl -X POST "http://localhost:8000/chats/?user_id=1" \
 
 ---
 
-### 7. List User's Chats
+### 12. List User's Chats
 
 #### GET `/chats/`
 Get all chats for a specific user.
@@ -231,7 +321,7 @@ curl "http://localhost:8000/chats/?user_id=1"
 
 ---
 
-### 8. Get Specific Chat
+### 13. Get Specific Chat
 
 #### GET `/chats/{chat_id}`
 Get a specific chat (verifies ownership).
@@ -253,7 +343,7 @@ curl "http://localhost:8000/chats/1?user_id=1"
 
 ---
 
-### 9. Delete Chat
+### 14. Delete Chat
 
 #### DELETE `/chats/{chat_id}`
 Delete a chat (verifies ownership).
@@ -273,7 +363,7 @@ curl -X DELETE "http://localhost:8000/chats/1?user_id=1"
 
 ## Document Management Endpoints
 
-### 10. Upload Document to Chat
+### 15. Upload Document to Chat
 
 #### POST `/documents/ingest`
 Upload and ingest a PDF document into a specific chat.
@@ -309,7 +399,7 @@ curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
 
 ## Chat Query Endpoint
 
-### 11. Query Within Chat
+### 16. Query Within Chat
 
 #### POST `/chats/query`
 Ask a question within a specific chat context.
@@ -344,7 +434,7 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 
 ---
 
-### 12. Generate Detailed Study Summary
+### 17. Generate Detailed Study Summary
 
 #### POST `/chats/detailed-summarizer`
 Generate a detailed study summary using the 80/20 rule from uploaded documents in a chat.
@@ -391,7 +481,7 @@ curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
 
 ---
 
-### 13. Generate Flashcards
+### 18. Generate Flashcards
 
 #### POST `/chats/flashcard`
 Generate intelligent flashcards from all uploaded documents in a chat.
@@ -641,7 +731,6 @@ rm -rf my_vector_db/
 
 ## Future Enhancements
 
-- [ ] User authentication & JWT tokens
 - [ ] Support for more file formats (docx, txt, images with OCR)
 - [ ] Hybrid search (BM25 + semantic)
 - [ ] Document metadata editing
