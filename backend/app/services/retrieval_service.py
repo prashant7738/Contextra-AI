@@ -1,6 +1,10 @@
 from app.core.embedder import embed_texts
 from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm
 from app.repositories.vector_repository import query_similar
+from app.services.flashcard_parsing import (
+    parse_flashcard_json_fallback,
+    parse_flashcard_marker_output,
+)
 import json
 import re
 
@@ -222,9 +226,9 @@ def generate_flashcards(
     flashcards_output = generate_flashcards_llm(context, max_tokens=max_tokens)
     
     # Step 3: Parse response in marker format first, then JSON as fallback
-    cleaned_flashcards = _parse_flashcards_marker_output(flashcards_output)
+    cleaned_flashcards = parse_flashcard_marker_output(flashcards_output)
     if not cleaned_flashcards:
-        cleaned_flashcards = _parse_flashcards_json_fallback(flashcards_output)
+        cleaned_flashcards = parse_flashcard_json_fallback(flashcards_output)
 
     if not cleaned_flashcards:
         raise ValueError(
@@ -237,102 +241,3 @@ def generate_flashcards(
         card["references"] = references
 
     return cleaned_flashcards, references
-
-
-def _fix_json_issues(json_str: str) -> str:
-    """
-    Attempt to fix common JSON formatting issues from LLM output.
-    """
-    # Remove trailing commas before ] and }
-    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-    
-    # Fix missing commas between objects (}, { pattern)
-    json_str = re.sub(r'(\})\s*(\{)', r'\1,\2', json_str)
-    
-    # Fix missing commas after closing braces before array elements
-    json_str = re.sub(r'(\})\s*(\{)', r'\1,\2', json_str)
-    
-    # Remove any control characters
-    json_str = ''.join(char for char in json_str if ord(char) >= 32 or char in '\n\r\t')
-    
-    return json_str
-
-
-def _parse_flashcards_marker_output(output: str) -> list[dict]:
-    """
-    Parse marker-based flashcard output.
-
-    Expected block format:
-    <<<FLASHCARD>>>
-    TOPIC: ...
-    SUMMARY: ...
-    EXPLANATION: ...
-    <<<END>>>
-    """
-    pattern = re.compile(
-        r"<<<FLASHCARD>>>\s*"
-        r"TOPIC:\s*(.*?)\s*"
-        r"SUMMARY:\s*(.*?)\s*"
-        r"EXPLANATION:\s*(.*?)\s*"
-        r"<<<END>>>",
-        re.DOTALL,
-    )
-
-    matches = pattern.findall(output)
-    parsed: list[dict] = []
-    for topic, summary, explanation in matches:
-        topic = topic.strip()
-        summary = summary.strip()
-        explanation = explanation.strip()
-        if not topic or not summary or not explanation:
-            continue
-        parsed.append(
-            {
-                "topic": topic,
-                "summary": summary,
-                "explanation": explanation,
-            }
-        )
-    return parsed
-
-
-def _parse_flashcards_json_fallback(output: str) -> list[dict]:
-    """
-    Fallback parser for legacy JSON-like output.
-    """
-    try:
-        json_start = output.find("{")
-        json_end = output.rfind("}") + 1
-        if json_start < 0 or json_end <= json_start:
-            return []
-
-        json_str = output[json_start:json_end].strip()
-        try:
-            parsed = json.loads(json_str)
-        except json.JSONDecodeError:
-            json_str = _fix_json_issues(json_str)
-            parsed = json.loads(json_str)
-
-        flashcards = parsed.get("flashcards", [])
-        if not isinstance(flashcards, list):
-            return []
-
-        cleaned_flashcards: list[dict] = []
-        for fc in flashcards:
-            if not isinstance(fc, dict):
-                continue
-            topic = str(fc.get("topic", "")).strip()
-            summary = str(fc.get("summary", "")).strip()
-            explanation = str(fc.get("explanation", "")).strip()
-            if not topic or not summary or not explanation:
-                continue
-            cleaned_flashcards.append(
-                {
-                    "topic": topic,
-                    "summary": summary,
-                    "explanation": explanation,
-                }
-            )
-        return cleaned_flashcards
-    except Exception:
-        return []

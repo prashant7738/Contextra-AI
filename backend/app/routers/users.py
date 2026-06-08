@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.schemas.user import UserCreate, UserResponse
-from app.services.user_service import list_users, get_user, create_user, delete_user
+from app.schemas.user import UserResponse
+from app.services.user_service import list_users, get_user, delete_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -20,11 +20,6 @@ def get_user_endpoint(user_id: int, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-
-
-@router.post("/", response_model=UserResponse)
-def create_user_endpoint(user: UserCreate, db: Session = Depends(get_db)):
-    return create_user(db, user)
 
 
 @router.delete("/{user_id}")

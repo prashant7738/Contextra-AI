@@ -16,10 +16,5 @@ def get_user(db: Session, user_id: int) -> UserResponse | None:
     return UserResponse.model_validate(user)
 
 
-def create_user(db: Session, data: UserCreate) -> UserResponse:
-    user = user_repository.create_user(db, name=data.name)
-    return UserResponse.model_validate(user)
-
-
 def delete_user(db: Session, user_id: int) -> bool:
     return user_repository.delete_user(db, user_id)
