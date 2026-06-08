@@ -51,6 +51,10 @@ DATABASE_URL=postgresql://user:password@localhost/contextra_ai_db
 HUGGINGFACE_API_KEY=your_hf_token_here
 CHROMA_PERSIST_DIR=./my_vector_db
 CHROMA_COLLECTION_NAME=knowledge-base
+ 
+# Admin
+# Set the admin email that can access the admin panel endpoints
+ADMIN_EMAIL=admin@example.com
 ```
 
 ## Running the Server
