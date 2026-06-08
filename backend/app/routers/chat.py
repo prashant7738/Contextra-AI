@@ -42,7 +42,7 @@ def get_chat_messages(chat_id: int, user_id: int, limit: int = Query(default=50,
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
 
-    messages = message_repository.get_chat_history(db, chat_id, user_id, limit=limit)
+    messages = message_repository.get_chat_history(db, chat.id, user_id, limit=limit)
     return [ChatMessageResponse.model_validate(message) for message in messages]
 
 
@@ -132,16 +132,16 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db),
     
     try:
         # Get previous chat history (last 10 messages)
-        chat_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
+        chat_history = message_repository.get_chat_history(db, chat.id, user_id, limit=10)
         
         # Answer query with chat history context
-        answer, references = answer_query(query.request, user_id, query.chat_id, chat_history=chat_history)
+        answer, references = answer_query(query.request, user_id, chat.id, chat_history=chat_history)
         
         # Save the message and response to history
-        saved_message = message_repository.save_message(db, query.chat_id, user_id, query.request, answer)
+        saved_message = message_repository.save_message(db, chat.id, user_id, query.request, answer)
         
         # Get updated history to return
-        updated_history = message_repository.get_chat_history(db, query.chat_id, user_id, limit=10)
+        updated_history = message_repository.get_chat_history(db, chat.id, user_id, limit=10)
         history_responses = [ChatMessageResponse.model_validate(msg) for msg in updated_history]
         
         return QueryResponse(
@@ -184,7 +184,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
             initial_answer, _ = answer_query(
                 question=payload.topic_name,
                 user_id=user_id,
-                chat_id=payload.chat_id,
+                chat_id=chat.id,
                 chat_history=None
             )
         
@@ -192,7 +192,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         summary, title, sections, references, chunks_used = generate_detailed_summary(
             topic_name=payload.topic_name or "all",
             user_id=user_id,
-            chat_id=payload.chat_id,
+            chat_id=chat.id,
             n_results=payload.n_results,
             max_tokens=payload.max_tokens,
             pre_generated_answer=initial_answer,
@@ -247,7 +247,7 @@ def generate_flashcard(user_id: int, chat_id: int, payload: Optional[FlashcardRe
         
         flashcards, references = generate_flashcards(
             user_id=user_id,
-            chat_id=chat_id,
+            chat_id=chat.id,
             n_results=n_results,
             max_tokens=max_tokens,
         )

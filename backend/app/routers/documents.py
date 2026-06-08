@@ -89,11 +89,11 @@ async def file_input(
                 f"{extraction_stats['ocr']} via OCR, {extraction_stats['failed']} failed"
             )
 
-            # Create document record in database
+            # Create document record in database (create_document will resolve chat local_id to global id)
             document = create_document(db, user_id, chat_id, file.filename, full_text)
 
-            # Ingest into vector database with user_id, document_id, and chat_id
-            chunks_count = ingest_text(pages_data, user_id=user_id, document_id=document.id, chat_id=chat_id)
+            # Ingest into vector database with user_id, document_id, and global chat_id
+            chunks_count = ingest_text(pages_data, user_id=user_id, document_id=document.id, chat_id=document.chat_id)
 
             logger.info(f"Document ingested: {chunks_count} chunks created")
 

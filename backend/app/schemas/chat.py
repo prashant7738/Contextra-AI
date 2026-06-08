@@ -9,6 +9,7 @@ class ChatCreate(BaseModel):
 
 class ChatResponse(BaseModel):
     id: int
+    local_id: int
     user_id: int
     name: str
     created_at: datetime
