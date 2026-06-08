@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -25,6 +25,6 @@ def get_token_from_header(authorization: str | None = None) -> str:
     return parts[1]
 
 
-def get_current_user(authorization: str | None = None, db: Session = Depends(get_db)):
+def get_current_user(authorization: str | None = Header(None), db: Session = Depends(get_db)):
     token = get_token_from_header(authorization)
     return auth_service.get_current_user(db, token)

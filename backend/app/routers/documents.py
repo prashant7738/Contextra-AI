@@ -6,6 +6,8 @@ import fitz
 import logging
 
 from app.database import get_db
+from app.dependencies import get_current_user
+from app.schemas.user import UserResponse
 from app.schemas.document import IngestionResponse
 from app.services.ingestion_service import ingest_text
 from app.services.document_service import create_document
@@ -23,7 +25,8 @@ async def file_input(
     file: Optional[UploadFile] = File(default=None),
     user_id: int = Query(...),
     chat_id: int = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user)
 ):
     """
     Upload and ingest a PDF document into a specific chat.
@@ -47,6 +50,9 @@ async def file_input(
 
     if not uploaded_files:
         raise HTTPException(status_code=422, detail="No file uploaded. Use multipart field 'files' (preferred) or 'file'.")
+
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
 
     results = []
     # Process each uploaded file sequentially
