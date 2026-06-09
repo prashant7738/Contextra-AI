@@ -14,11 +14,25 @@ import '../styles/global.css';
       <div class="ambient ambient-one"></div>
       <div class="ambient ambient-two"></div>
 
-      <section class="frame">
-        <aside class="sidebar panel">
+      <header class="topbar panel">
+        <div class="topbar-brand">
+          <p class="eyebrow">Contextra AI</p>
+          <h1>Study cockpit</h1>
+        </div>
+        <div class="topbar-actions">
+          <div id="profile-pill" class="profile-pill" aria-live="polite">
+            <span id="profile-avatar" class="profile-avatar">U</span>
+            <span id="profile-name">User</span>
+          </div>
+          <button id="logout-btn" class="button button-ghost" type="button">Logout</button>
+        </div>
+      </header>
+
+      <section class="frame frame-rails" id="frame-rails">
+        <aside class="sidebar panel left-rail" id="left-rail">
           <div class="brand-block">
-            <p class="eyebrow">Contextra AI</p>
-            <h1>Quiet chat workspace</h1>
+            <p class="eyebrow">Workspace</p>
+            <h2>Quiet chat workspace</h2>
           </div>
 
           <div class="stack">
@@ -34,6 +48,8 @@ import '../styles/global.css';
           </div>
         </aside>
 
+        <button class="resize-handle" id="left-resize" type="button" aria-label="Resize left sidebar" title="Drag to resize left sidebar"></button>
+
         <section class="workspace panel">
           <header class="workspace-head">
             <div>
@@ -46,7 +62,37 @@ import '../styles/global.css';
             </div>
           </header>
 
-          <details class="summary-disclosure" aria-live="polite">
+          <div id="message-stream" class="message-stream">
+            <div class="empty-state">
+              <h3>Select a chat</h3>
+              <p>Choose a chat from the left sidebar or create a new one to start asking questions about your notes.</p>
+            </div>
+          </div>
+
+          <div id="composer" class="composer" hidden>
+            <div id="composer-upload" class="composer-upload" hidden>
+              <label class="dropzone" id="dropzone-label" for="file-input">
+                <strong>Drop PDF here or click to choose a file</strong>
+                <span>Upload one PDF per chat to index references before asking questions.</span>
+              </label>
+              <div class="upload-row">
+                <input id="file-input" type="file" accept=".pdf,application/pdf" />
+                <button id="upload-btn" class="button button-primary" type="button">Upload PDF</button>
+              </div>
+            </div>
+            <div class="composer-bar">
+              <button id="toggle-upload" class="button button-ghost" type="button" title="Attach PDF">Upload</button>
+              <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
+              <button id="send-btn" class="button button-primary" type="button">Send</button>
+            </div>
+            <p id="status-line" class="status-line"></p>
+          </div>
+        </section>
+
+        <button class="resize-handle" id="right-resize" type="button" aria-label="Resize right sidebar" title="Drag to resize right sidebar"></button>
+
+        <aside class="sidebar panel right-rail" id="right-rail">
+          <details class="summary-disclosure" aria-live="polite" open>
             <summary class="disclosure-summary summary-head">
               <div>
                 <p class="eyebrow">Insight Layer</p>
@@ -75,39 +121,66 @@ import '../styles/global.css';
                   <button id="summary-clear" class="button button-ghost" type="button">Clear</button>
                 </div>
               </form>
+              <div id="summary-output" class="summary-output">
+                <p class="empty">Generate a focused summary for the selected chat.</p>
+              </div>
             </div>
           </details>
 
-          <div id="message-stream" class="message-stream">
-            <div class="empty-state">
-              <h3>Select a chat</h3>
-              <p>Choose a chat from the sidebar or create a new one to start asking questions about your notes.</p>
-            </div>
-          </div>
-
-          <div id="composer" class="composer" hidden>
-            <div id="composer-upload" class="composer-upload" hidden>
-              <label class="dropzone" id="dropzone-label">
-                <strong>Drop PDF here or click to upload</strong>
-                <span>Upload a PDF document to add context from your notes</span>
-              </label>
-              <div class="upload-row">
-                <input id="file-input" type="file" accept=".pdf" />
-                <button id="upload-btn" class="button button-primary" type="button">Upload</button>
+          <section class="flashcard-panel" aria-live="polite">
+            <div class="flashcard-head">
+              <div>
+                <p class="eyebrow">Memory Layer</p>
+                <h3>Flashcards</h3>
+                <p class="flashcard-copy">Generate clean, topic-grouped recall cards from the selected chat.</p>
+              </div>
+              <div class="flashcard-actions">
+                <span id="flashcard-chat-pill" class="pill">No chat selected</span>
+                <button id="flashcard-generate" class="button button-primary" type="button">Generate</button>
               </div>
             </div>
-            <div class="composer-bar">
-              <button id="toggle-upload" class="button button-ghost" type="button" title="Attach PDF">+</button>
-              <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
-              <button id="send-btn" class="button button-primary" type="button">Send</button>
+            <div class="flashcard-stats">
+              <div class="flashcard-stat">
+                <strong id="flashcard-topic-count">0</strong>
+                <span>Topics</span>
+              </div>
+              <div class="flashcard-stat">
+                <strong id="flashcard-count">0</strong>
+                <span>Cards</span>
+              </div>
+              <div class="flashcard-stat">
+                <strong id="flashcard-chunk-count">5</strong>
+                <span>Chunks</span>
+              </div>
             </div>
-            <p id="status-line" class="status-line"></p>
-          </div>
-        </section>
+
+            <div class="summary-controls">
+              <label class="field">
+                <span>Context chunks</span>
+                <select id="flashcard-results">
+                  <option value="3">3 chunks</option>
+                  <option value="5" selected>5 chunks</option>
+                  <option value="10">10 chunks</option>
+                  <option value="15">15 chunks</option>
+                </select>
+              </label>
+              <div></div>
+              <div class="summary-actions">
+                <button id="flashcard-clear" class="button button-ghost" type="button">Clear</button>
+              </div>
+            </div>
+
+            <p id="flashcard-status" class="status-line flashcard-status"></p>
+            <div id="flashcard-output" class="flashcard-output">
+              <p class="empty">Generate flashcards to see learning cards here.</p>
+            </div>
+          </section>
+        </aside>
       </section>
     </main>
 
     <script>
+      // @ts-nocheck
       const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
       (function () {
@@ -134,7 +207,11 @@ import '../styles/global.css';
         const refreshBtn = document.getElementById('refresh-chats');
         const chatTitle = document.getElementById('chat-title');
         const identityPill = document.getElementById('identity-pill');
+        const profileName = document.getElementById('profile-name');
+        const profileAvatar = document.getElementById('profile-avatar');
+        const logoutBtn = document.getElementById('logout-btn');
         const summaryChatPill = document.getElementById('summary-chat-pill');
+        const flashcardChatPill = document.getElementById('flashcard-chat-pill');
         const messageStream = document.getElementById('message-stream');
         const composer = document.getElementById('composer');
         const queryInput = document.getElementById('query-input');
@@ -145,12 +222,46 @@ import '../styles/global.css';
         const uploadBtn = document.getElementById('upload-btn');
         const dropzoneLabel = document.getElementById('dropzone-label');
         const statusLine = document.getElementById('status-line');
+        const connectionPill = document.getElementById('connection-pill');
+
+        const summaryForm = document.getElementById('summary-form');
+        const summaryTopic = document.getElementById('summary-topic');
+        const summaryResults = document.getElementById('summary-results');
+        const summaryOutput = document.getElementById('summary-output');
+        const summaryClearBtn = document.getElementById('summary-clear');
+
+        const flashcardGenerateBtn = document.getElementById('flashcard-generate');
+        const flashcardClearBtn = document.getElementById('flashcard-clear');
+        const flashcardResults = document.getElementById('flashcard-results');
+        const flashcardOutput = document.getElementById('flashcard-output');
+        const flashcardStatus = document.getElementById('flashcard-status');
+        const flashcardTopicCount = document.getElementById('flashcard-topic-count');
+        const flashcardCount = document.getElementById('flashcard-count');
+        const flashcardChunkCount = document.getElementById('flashcard-chunk-count');
+
+        const frameRails = document.getElementById('frame-rails');
+        const leftResize = document.getElementById('left-resize');
+        const rightResize = document.getElementById('right-resize');
 
         if (identityPill) {
           identityPill.textContent = user.name;
         }
+        if (profileName) profileName.textContent = user.name || 'User';
+        if (profileAvatar) {
+          const initials = (user.name || 'User').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
+          profileAvatar.textContent = initials || 'U';
+        }
 
         let selectedChatId = null;
+        let selectedUploadFile = null;
+        const flashcardExpanded = new Set();
+
+        function setConnection(text, tone) {
+          if (!connectionPill) return;
+          connectionPill.textContent = text;
+          if (tone) connectionPill.dataset.tone = tone;
+          else delete connectionPill.dataset.tone;
+        }
 
         function token() {
           return localStorage.getItem('access_token');
@@ -176,8 +287,10 @@ import '../styles/global.css';
             }
             const chats = await resp.json();
             renderChats(chats);
+            setConnection('Connected', 'success');
           } catch (err) {
             console.error('Load chats error:', err);
+            setConnection('Offline', 'danger');
           }
         }
 
@@ -206,15 +319,18 @@ import '../styles/global.css';
         }
 
         function selectChat(chatId, localId, chatName) {
-          selectedChatId = localId;
+          selectedChatId = chatId;
           if (chatTitle) chatTitle.textContent = chatName;
           if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
+          if (flashcardChatPill) flashcardChatPill.textContent = `#${localId} ${chatName}`;
           chatList.querySelectorAll('.chat-item').forEach(c => c.classList.remove('chat-item-active'));
           const activeBtn = chatList.querySelector(`[data-local-id="${localId}"]`);
           if (activeBtn) activeBtn.classList.add('chat-item-active');
           if (composer) composer.hidden = false;
           setStatus('');
-          loadMessages(localId);
+          resetSummary();
+          clearFlashcards();
+          loadMessages(chatId);
         }
 
         async function loadMessages(chatId) {
@@ -244,18 +360,28 @@ import '../styles/global.css';
             return;
           }
           messageStream.innerHTML = messages.map(msg => `
-            <div class="turn">
-              <div class="bubble bubble-user">
-                <p class="bubble-label">You</p>
-                <p>${escapeHtml(msg.user_message)}</p>
+            <article class="turn">
+              <div class="turn-meta">${formatDate(msg.created_at)}</div>
+              <div class="turn-card">
+                <div class="bubble bubble-user">
+                  <p class="bubble-label">You</p>
+                  <p>${escapeHtml(msg.user_message)}</p>
+                </div>
+                <div class="bubble bubble-bot">
+                  <p class="bubble-label">Assistant</p>
+                  <p>${escapeHtml(msg.bot_response)}</p>
+                </div>
               </div>
-              <div class="bubble bubble-bot">
-                <p class="bubble-label">Assistant</p>
-                <p>${escapeHtml(msg.bot_response)}</p>
-              </div>
-            </div>
+            </article>
           `).join('');
           messageStream.scrollTop = messageStream.scrollHeight;
+        }
+
+        function formatDate(iso) {
+          if (!iso) return 'Now';
+          const date = new Date(iso);
+          if (Number.isNaN(date.getTime())) return 'Now';
+          return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
         function escapeHtml(text) {
@@ -330,7 +456,8 @@ import '../styles/global.css';
 
         async function uploadFile(file) {
           if (!file || !selectedChatId) return;
-          if (file.type !== 'application/pdf') {
+          const name = file.name || 'file';
+          if (!name.toLowerCase().endsWith('.pdf')) {
             setStatus('Only PDF files are supported', 'danger');
             return;
           }
@@ -358,12 +485,254 @@ import '../styles/global.css';
               setStatus(`Upload issue: ${r.status}`, 'warning');
             }
             fileInput.value = '';
+            selectedUploadFile = null;
           } catch (err) {
             console.error('Upload error:', err);
             setStatus(`Upload failed: ${err.message}`, 'danger');
           } finally {
             uploadBtn.disabled = false;
           }
+        }
+
+        async function generateSummary(ev) {
+          ev.preventDefault();
+          if (!selectedChatId) {
+            setStatus('Select a chat before generating summary', 'warning');
+            return;
+          }
+          if (!summaryOutput) return;
+
+          const topic = summaryTopic?.value?.trim() || 'all';
+          const nResults = Number(summaryResults?.value || 5);
+          const submitBtn = document.getElementById('summary-generate');
+          if (submitBtn) submitBtn.disabled = true;
+          summaryOutput.innerHTML = '<p class="empty">Generating summary...</p>';
+
+          try {
+            const resp = await fetch(`${API_BASE}/chats/detailed-summarizer?user_id=${user.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token()}`,
+              },
+              body: JSON.stringify({
+                chat_id: selectedChatId,
+                topic_name: topic,
+                n_results: nResults,
+                max_tokens: 900,
+              }),
+            });
+
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
+
+            const data = await resp.json();
+            renderSummary(data);
+          } catch (err) {
+            console.error('Summary error:', err);
+            summaryOutput.innerHTML = `<p class="empty">Unable to generate summary: ${escapeHtml(err.message)}</p>`;
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        }
+
+        function renderSummary(data) {
+          if (!summaryOutput) return;
+          const sections = (data.sections || []).map(section => `
+            <div class="summary-sources">
+              <h4>${escapeHtml(section.heading || 'Section')}</h4>
+              <ul>
+                ${(section.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          `).join('');
+
+          const references = (data.references || []).map(ref => `
+            <li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>
+          `).join('');
+
+          summaryOutput.innerHTML = `
+            <article class="summary-card">
+              <div class="summary-card-head">
+                <span class="pill">${escapeHtml(data.topic || 'all')}</span>
+                <span class="pill">${Number(data.chunks_used || 0)} chunks</span>
+              </div>
+              <p class="summary-body">${escapeHtml(data.summary || 'No summary content')}</p>
+              ${sections || ''}
+              ${references ? `<div class="summary-sources"><h4>References</h4><ul>${references}</ul></div>` : ''}
+            </article>
+          `;
+        }
+
+        function resetSummary() {
+          if (!summaryOutput) return;
+          summaryOutput.innerHTML = '<p class="empty">Generate a focused summary for the selected chat.</p>';
+        }
+
+        function setFlashcardStatus(message, tone) {
+          if (!flashcardStatus) return;
+          flashcardStatus.textContent = message;
+          if (tone) flashcardStatus.dataset.tone = tone;
+          else delete flashcardStatus.dataset.tone;
+        }
+
+        async function generateFlashcards() {
+          if (!selectedChatId || !flashcardOutput) {
+            setFlashcardStatus('Select a chat before generating flashcards', 'warning');
+            return;
+          }
+
+          const nResults = Number(flashcardResults?.value || 5);
+          if (flashcardChunkCount) flashcardChunkCount.textContent = String(nResults);
+          flashcardGenerateBtn.disabled = true;
+          flashcardOutput.innerHTML = '<p class="empty">Generating flashcards...</p>';
+          setFlashcardStatus('Generating...', 'warning');
+
+          try {
+            const resp = await fetch(`${API_BASE}/chats/flashcard?user_id=${user.id}&chat_id=${selectedChatId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token()}`,
+              },
+              body: JSON.stringify({ n_results: nResults, max_tokens: 1200 }),
+            });
+
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
+
+            const data = await resp.json();
+            renderFlashcards(data.flashcards || []);
+            if (flashcardTopicCount) flashcardTopicCount.textContent = String(data.total_topics || 0);
+            if (flashcardCount) flashcardCount.textContent = String(data.total_flashcards || 0);
+            setFlashcardStatus('Flashcards generated', 'success');
+          } catch (err) {
+            console.error('Flashcard error:', err);
+            flashcardOutput.innerHTML = `<p class="empty">Unable to generate flashcards: ${escapeHtml(err.message)}</p>`;
+            setFlashcardStatus('Generation failed', 'danger');
+          } finally {
+            flashcardGenerateBtn.disabled = false;
+          }
+        }
+
+        function renderFlashcards(cards) {
+          if (!flashcardOutput) return;
+          flashcardExpanded.clear();
+
+          if (!cards.length) {
+            flashcardOutput.innerHTML = '<p class="empty">No flashcards returned for this chat.</p>';
+            return;
+          }
+
+          flashcardOutput.innerHTML = `
+            <div class="flashcard-grid">
+              ${cards.map((card, index) => {
+                const refs = (card.references || []).map(ref => `
+                  <li>${escapeHtml(ref.filename || 'Source')} <small>p.${ref.page || '-'}</small></li>
+                `).join('');
+
+                return `
+                  <article class="flashcard-card" data-card-index="${index}">
+                    <button class="flashcard-summary" type="button" data-toggle-index="${index}">
+                      <div class="flashcard-topline">
+                        <strong class="flashcard-topic">${escapeHtml(card.topic || 'Topic')}</strong>
+                        <span class="flashcard-badge">Card ${index + 1}</span>
+                      </div>
+                      <p class="flashcard-summary-text">${escapeHtml(card.summary || '')}</p>
+                      <span class="flashcard-hint">Expand</span>
+                    </button>
+                    <div class="flashcard-details">
+                      <div class="flashcard-details-inner">
+                        <p class="flashcard-explanation">${escapeHtml(card.explanation || 'No explanation')}</p>
+                        ${refs ? `<div class="flashcard-sources"><h4>References</h4><ul>${refs}</ul></div>` : ''}
+                      </div>
+                    </div>
+                  </article>
+                `;
+              }).join('')}
+            </div>
+          `;
+
+          flashcardOutput.querySelectorAll('[data-toggle-index]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const index = Number(btn.dataset.toggleIndex);
+              if (flashcardExpanded.has(index)) flashcardExpanded.delete(index);
+              else flashcardExpanded.add(index);
+              const card = flashcardOutput.querySelector(`[data-card-index="${index}"]`);
+              if (card) card.classList.toggle('flashcard-card-open', flashcardExpanded.has(index));
+              const hint = btn.querySelector('.flashcard-hint');
+              if (hint) hint.textContent = flashcardExpanded.has(index) ? 'Collapse' : 'Expand';
+            });
+          });
+        }
+
+        function clearFlashcards() {
+          if (flashcardOutput) flashcardOutput.innerHTML = '<p class="empty">Generate flashcards to see learning cards here.</p>';
+          if (flashcardTopicCount) flashcardTopicCount.textContent = '0';
+          if (flashcardCount) flashcardCount.textContent = '0';
+          setFlashcardStatus('');
+        }
+
+        function setSelectedUpload(file) {
+          selectedUploadFile = file;
+          if (!file) {
+            setStatus('No file selected', 'warning');
+            return;
+          }
+          setStatus(`Selected ${file.name}`, 'success');
+        }
+
+        function setupResizableRails() {
+          if (!frameRails || !leftResize || !rightResize) return;
+
+          const storedLeft = Number(localStorage.getItem('dashboard_left_width') || 320);
+          const storedRight = Number(localStorage.getItem('dashboard_right_width') || 380);
+          frameRails.style.setProperty('--left-width', `${Math.max(260, Math.min(460, storedLeft))}px`);
+          frameRails.style.setProperty('--right-width', `${Math.max(300, Math.min(540, storedRight))}px`);
+
+          let activeSide = null;
+
+          function onMove(ev) {
+            if (!activeSide) return;
+            const rect = frameRails.getBoundingClientRect();
+            if (activeSide === 'left') {
+              const next = Math.max(260, Math.min(460, ev.clientX - rect.left));
+              frameRails.style.setProperty('--left-width', `${next}px`);
+            }
+            if (activeSide === 'right') {
+              const next = Math.max(300, Math.min(540, rect.right - ev.clientX));
+              frameRails.style.setProperty('--right-width', `${next}px`);
+            }
+          }
+
+          function stopDrag() {
+            if (!activeSide) return;
+            const left = frameRails.style.getPropertyValue('--left-width').replace('px', '');
+            const right = frameRails.style.getPropertyValue('--right-width').replace('px', '');
+            localStorage.setItem('dashboard_left_width', left);
+            localStorage.setItem('dashboard_right_width', right);
+            document.body.classList.remove('is-resizing');
+            activeSide = null;
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', stopDrag);
+          }
+
+          function startDrag(side) {
+            if (window.innerWidth < 1100) return;
+            activeSide = side;
+            document.body.classList.add('is-resizing');
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', stopDrag);
+          }
+
+          leftResize.addEventListener('pointerdown', () => startDrag('left'));
+          rightResize.addEventListener('pointerdown', () => startDrag('right'));
         }
 
         chatForm?.addEventListener('submit', async (ev) => {
@@ -405,24 +774,70 @@ import '../styles/global.css';
         toggleUpload?.addEventListener('click', () => {
           if (!composerUpload) return;
           composerUpload.hidden = !composerUpload.hidden;
-          toggleUpload.textContent = composerUpload.hidden ? '+' : '−';
+          toggleUpload.textContent = composerUpload.hidden ? 'Upload' : 'Close Upload';
         });
 
-        dropzoneLabel?.addEventListener('click', () => fileInput?.click());
+        dropzoneLabel?.addEventListener('dragover', (ev) => {
+          ev.preventDefault();
+          dropzoneLabel.classList.add('dropzone-active');
+        });
+
+        dropzoneLabel?.addEventListener('dragleave', () => {
+          dropzoneLabel.classList.remove('dropzone-active');
+        });
+
+        dropzoneLabel?.addEventListener('drop', (ev) => {
+          ev.preventDefault();
+          dropzoneLabel.classList.remove('dropzone-active');
+          const file = ev.dataTransfer?.files?.[0];
+          if (!file) return;
+          if (!file.name.toLowerCase().endsWith('.pdf')) {
+            setStatus('Only PDF files are supported', 'danger');
+            return;
+          }
+          setSelectedUpload(file);
+        });
+
         fileInput?.addEventListener('change', () => {
           if (fileInput.files && fileInput.files[0]) {
-            uploadFile(fileInput.files[0]);
+            const file = fileInput.files[0];
+            if (file.type && file.type !== 'application/pdf') {
+              setStatus('Only PDF files are supported', 'danger');
+              fileInput.value = '';
+              return;
+            }
+            setSelectedUpload(file);
           }
         });
 
         uploadBtn?.addEventListener('click', () => {
-          if (fileInput.files && fileInput.files[0]) {
+          if (selectedUploadFile) {
+            uploadFile(selectedUploadFile);
+          } else if (fileInput.files && fileInput.files[0]) {
             uploadFile(fileInput.files[0]);
+          } else {
+            fileInput?.click();
           }
+        });
+
+        summaryForm?.addEventListener('submit', generateSummary);
+        summaryClearBtn?.addEventListener('click', () => {
+          if (summaryTopic) summaryTopic.value = '';
+          resetSummary();
+        });
+
+        flashcardGenerateBtn?.addEventListener('click', generateFlashcards);
+        flashcardClearBtn?.addEventListener('click', clearFlashcards);
+
+        logoutBtn?.addEventListener('click', () => {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('current_user');
+          window.location.href = '/login';
         });
 
         refreshBtn?.addEventListener('click', loadChats);
 
+        setupResizableRails();
         loadChats();
       })();
     </script>
