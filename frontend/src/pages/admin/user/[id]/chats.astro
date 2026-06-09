@@ -1,0 +1,39 @@
+---
+const { id } = Astro.params;
+import Layout from '../../../../components/AuthWrapper.jsx';
+---
+<Layout>
+  <main style="max-width:900px;margin:48px auto;padding:24px;">
+    <h2>Chats for user #{id}</h2>
+    <div id="loading">Loading chats…</div>
+    <ul id="chats" style="list-style:none;padding:0;margin:0;display:grid;grid-gap:10px"></ul>
+  </main>
+
+  <script type="module">
+    import { apiClient } from '/src/utils/api';
+    const chatsEl = document.getElementById('chats');
+    const loadingEl = document.getElementById('loading');
+    async function load(){
+      loadingEl.style.display='block';
+      const res = await apiClient.get(`/admin/users/${id}/chats`);
+      loadingEl.style.display='none';
+      if(res.error){
+        chatsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${res.error}</li>`;
+        return;
+      }
+      const chats = res.data || [];
+      if(!chats.length){
+        chatsEl.innerHTML = '<li style="padding:12px;background:#f4f6f9;border-radius:8px">No chats</li>';
+        return;
+      }
+      chatsEl.innerHTML = chats.map(c => `
+        <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
+          <div style="font-weight:600">${c.name}</div>
+          <div style="font-size:13px;color:#667">ID: ${c.id}</div>
+          <a href="/admin/chat/${c.id}/messages">View messages</a>
+        </li>
+      `).join('');
+    }
+    load();
+  </script>
+</Layout>

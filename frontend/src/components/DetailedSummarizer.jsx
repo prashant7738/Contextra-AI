@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import styles from './DetailedSummarizer.module.css';
+import { apiClient } from '/src/utils/api';
 
 export default function DetailedSummarizer() {
   const [formData, setFormData] = useState({
@@ -16,7 +17,7 @@ export default function DetailedSummarizer() {
   const [expandedCards, setExpandedCards] = useState(new Set());
   const resultsRef = useRef(null);
 
-  const API_BASE = import.meta.env.PUBLIC_API_BASE || 'http://localhost:8000';
+  // use centralized apiClient which includes auth headers
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -49,23 +50,13 @@ export default function DetailedSummarizer() {
         payload.chat_id = parseInt(formData.chatId);
       }
 
-      const response = await fetch(
-        `${API_BASE}/chats/detailed-summarizer?${params}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload)
-        }
-      );
+      const res = await apiClient.post(`/chats/detailed-summarizer?${params}`, payload);
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+      if (res.error) {
+        throw new Error(res.error);
       }
 
-      const data = await response.json();
-      setResults([data]);
+      setResults([res.data]);
       setShowResults(true);
       setExpandedCards(new Set());
 

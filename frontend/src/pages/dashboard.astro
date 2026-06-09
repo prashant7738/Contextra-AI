@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 ---
 
 <html lang="en">
@@ -19,52 +20,26 @@ import '../styles/global.css';
           <div class="brand-block">
             <p class="eyebrow">Contextra AI</p>
             <h1>Quiet chat workspace</h1>
-            <p class="lede">Create a user, open a chat, upload PDFs, and talk to the backend in one place.</p>
           </div>
-
-          <div class="auth-section" style="margin-bottom: 20px;">
-            <div id="user-profile"></div>
-            <button id="logout-btn" class="button button-ghost" type="button">Logout</button>
-          </div>
-
-          <form id="user-form" class="stack">
-            <label class="field">
-              <span>New user</span>
-              <input id="user-name" name="user-name" type="text" placeholder="Ava Stone" autocomplete="off" />
-            </label>
-            <button class="button button-primary" type="submit">Create user</button>
-          </form>
 
           <div class="stack">
             <div class="section-head">
-              <h2>Users</h2>
-              <button id="refresh-users" class="button button-ghost" type="button">Refresh</button>
-            </div>
-            <div id="user-list" class="choice-list"></div>
-          </div>
-
-          <details class="chat-disclosure">
-            <summary class="disclosure-summary section-head">
               <h2>Chats</h2>
-              <span class="disclosure-hint">Open chat list</span>
-            </summary>
-            <div class="disclosure-body stack">
               <button id="refresh-chats" class="button button-ghost" type="button">Refresh</button>
-              <form id="chat-form" class="row-form">
-                <input id="chat-name" type="text" placeholder="New study thread" autocomplete="off" />
-                <button class="button button-primary" type="submit">New</button>
-              </form>
-              <div id="chat-list" class="chat-list"></div>
             </div>
-          </details>
-
+            <form id="chat-form" class="row-form">
+              <input id="chat-name" type="text" placeholder="New study thread" autocomplete="off" />
+              <button class="button button-primary" type="submit">New</button>
+            </form>
+            <div id="chat-list" class="chat-list"></div>
+          </div>
         </aside>
 
         <section class="workspace panel">
           <header class="workspace-head">
             <div>
               <p class="eyebrow">Live backend connection</p>
-              <h2 id="chat-title">Select a user and chat</h2>
+              <h2 id="chat-title">Select a chat</h2>
             </div>
             <div class="pills">
               <span id="identity-pill" class="pill">No user selected</span>
@@ -108,11 +83,9 @@ import '../styles/global.css';
     </main>
 
     <script>
-      // Check if user is authenticated
       function isAuthenticated() {
         try {
-          const token = localStorage.getItem('access_token');
-          return !!token;
+          return !!localStorage.getItem('access_token');
         } catch {
           return false;
         }
@@ -127,35 +100,102 @@ import '../styles/global.css';
         }
       }
 
-      // Redirect if not authenticated
       if (!isAuthenticated()) {
         window.location.href = '/login';
-      } else {
-        // Display current user
+      }
+    </script>
+
+    <script>
+      const API_BASE = '{API_BASE}';
+
+      (function () {
         const user = getCurrentUser();
-        if (user) {
-          const profileDiv = document.getElementById('user-profile');
-          if (profileDiv) {
-            profileDiv.innerHTML = `
-              <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Logged in as:</p>
-              <p style="margin: 0; font-weight: 600; color: #333;">${user.name}</p>
-              <p style="margin: 0; font-size: 12px; color: #999;">${user.email}</p>
-            `;
+        if (!user) return;
+
+        const chatList = document.getElementById('chat-list');
+        const chatForm = document.getElementById('chat-form');
+        const chatNameInput = document.getElementById('chat-name');
+        const refreshBtn = document.getElementById('refresh-chats');
+        const chatTitle = document.getElementById('chat-title');
+        const identityPill = document.getElementById('identity-pill');
+        const summaryChatPill = document.getElementById('summary-chat-pill');
+
+        if (identityPill) {
+          identityPill.textContent = user.name;
+        }
+
+        let selectedChatId = null;
+
+        async function loadChats() {
+          try {
+            const token = localStorage.getItem('access_token');
+            const resp = await fetch(`${API_BASE}/chats/?user_id=${user.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!resp.ok) throw new Error('Failed to load chats');
+            const chats = await resp.json();
+            renderChats(chats);
+          } catch (err) {
+            console.error('Load chats error:', err);
           }
         }
 
-        // Handle logout
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) {
-          logoutBtn.addEventListener('click', () => {
-            // Clear tokens
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('current_user');
-            window.location.href = '/login';
+        function renderChats(chats) {
+          if (!chatList) return;
+          if (!chats || chats.length === 0) {
+            chatList.innerHTML = '<p class="empty">No chats yet. Create one above.</p>';
+            return;
+          }
+          chatList.innerHTML = chats.map(chat => {
+            const active = chat.id === selectedChatId ? ' chat-item-active' : '';
+            return `<button class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}">
+              <span>${chat.name}</span>
+              <small>#${chat.local_id}</small>
+            </button>`;
+          }).join('');
+
+          chatList.querySelectorAll('.chat-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+              selectedChatId = Number(btn.dataset.chatId);
+              const localId = btn.dataset.localId;
+              const chatName = btn.querySelector('span')?.textContent || 'Chat';
+
+              if (chatTitle) chatTitle.textContent = chatName;
+              if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
+
+              chatList.querySelectorAll('.chat-item').forEach(c => c.classList.remove('chat-item-active'));
+              btn.classList.add('chat-item-active');
+            });
           });
         }
-      }
+
+        chatForm?.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const name = chatNameInput?.value?.trim();
+          if (!name) return;
+
+          try {
+            const token = localStorage.getItem('access_token');
+            const resp = await fetch(`${API_BASE}/chats/?user_id=${user.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ name }),
+            });
+            if (!resp.ok) throw new Error('Failed to create chat');
+            chatNameInput.value = '';
+            await loadChats();
+          } catch (err) {
+            alert('Error creating chat: ' + (err?.message || err));
+          }
+        });
+
+        refreshBtn?.addEventListener('click', loadChats);
+
+        loadChats();
+      })();
     </script>
   </body>
 </html>
