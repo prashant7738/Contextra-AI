@@ -1,6 +1,5 @@
 ---
 import '../styles/global.css';
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 ---
 
 <html lang="en">
@@ -83,33 +82,24 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
     </main>
 
     <script>
-      function isAuthenticated() {
-        try {
-          return !!localStorage.getItem('access_token');
-        } catch {
-          return false;
-        }
-      }
-
-      function getCurrentUser() {
-        try {
-          const userJson = localStorage.getItem('current_user');
-          return userJson ? JSON.parse(userJson) : null;
-        } catch {
-          return null;
-        }
-      }
-
-      if (!isAuthenticated()) {
-        window.location.href = '/login';
-      }
-    </script>
-
-    <script>
-      const API_BASE = '{API_BASE}';
+      const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
       (function () {
-        const user = getCurrentUser();
+        try {
+          if (!localStorage.getItem('access_token')) {
+            window.location.href = '/login';
+            return;
+          }
+        } catch {
+          window.location.href = '/login';
+          return;
+        }
+
+        let user = null;
+        try {
+          const userJson = localStorage.getItem('current_user');
+          if (userJson) user = JSON.parse(userJson);
+        } catch {}
         if (!user) return;
 
         const chatList = document.getElementById('chat-list');
@@ -129,10 +119,16 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
         async function loadChats() {
           try {
             const token = localStorage.getItem('access_token');
-            const resp = await fetch(`${API_BASE}/chats/?user_id=${user.id}`, {
+            const url = `${API_BASE}/chats/?user_id=${user.id}`;
+            console.log('Loading chats from:', url);
+            const resp = await fetch(url, {
               headers: { Authorization: `Bearer ${token}` },
             });
-            if (!resp.ok) throw new Error('Failed to load chats');
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
             const chats = await resp.json();
             renderChats(chats);
           } catch (err) {
@@ -176,7 +172,9 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
           try {
             const token = localStorage.getItem('access_token');
-            const resp = await fetch(`${API_BASE}/chats/?user_id=${user.id}`, {
+            const url = `${API_BASE}/chats/?user_id=${user.id}`;
+            console.log('Creating chat:', { url, token: token?.slice(0,20) + '...', name });
+            const resp = await fetch(url, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -184,10 +182,15 @@ const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
               },
               body: JSON.stringify({ name }),
             });
-            if (!resp.ok) throw new Error('Failed to create chat');
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
             chatNameInput.value = '';
             await loadChats();
           } catch (err) {
+            console.error('Chat creation error:', err);
             alert('Error creating chat: ' + (err?.message || err));
           }
         });
