@@ -77,6 +77,32 @@ import '../styles/global.css';
               </form>
             </div>
           </details>
+
+          <div id="message-stream" class="message-stream">
+            <div class="empty-state">
+              <h3>Select a chat</h3>
+              <p>Choose a chat from the sidebar or create a new one to start asking questions about your notes.</p>
+            </div>
+          </div>
+
+          <div id="composer" class="composer" hidden>
+            <div id="composer-upload" class="composer-upload" hidden>
+              <label class="dropzone" id="dropzone-label">
+                <strong>Drop PDF here or click to upload</strong>
+                <span>Upload a PDF document to add context from your notes</span>
+              </label>
+              <div class="upload-row">
+                <input id="file-input" type="file" accept=".pdf" />
+                <button id="upload-btn" class="button button-primary" type="button">Upload</button>
+              </div>
+            </div>
+            <div class="composer-bar">
+              <button id="toggle-upload" class="button button-ghost" type="button" title="Attach PDF">+</button>
+              <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
+              <button id="send-btn" class="button button-primary" type="button">Send</button>
+            </div>
+            <p id="status-line" class="status-line"></p>
+          </div>
         </section>
       </section>
     </main>
@@ -109,6 +135,16 @@ import '../styles/global.css';
         const chatTitle = document.getElementById('chat-title');
         const identityPill = document.getElementById('identity-pill');
         const summaryChatPill = document.getElementById('summary-chat-pill');
+        const messageStream = document.getElementById('message-stream');
+        const composer = document.getElementById('composer');
+        const queryInput = document.getElementById('query-input');
+        const sendBtn = document.getElementById('send-btn');
+        const toggleUpload = document.getElementById('toggle-upload');
+        const composerUpload = document.getElementById('composer-upload');
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const dropzoneLabel = document.getElementById('dropzone-label');
+        const statusLine = document.getElementById('status-line');
 
         if (identityPill) {
           identityPill.textContent = user.name;
@@ -116,13 +152,22 @@ import '../styles/global.css';
 
         let selectedChatId = null;
 
+        function token() {
+          return localStorage.getItem('access_token');
+        }
+
+        function setStatus(msg, tone) {
+          if (!statusLine) return;
+          statusLine.textContent = msg;
+          if (tone) statusLine.dataset.tone = tone;
+          else delete statusLine.dataset.tone;
+        }
+
         async function loadChats() {
           try {
-            const token = localStorage.getItem('access_token');
             const url = `${API_BASE}/chats/?user_id=${user.id}`;
-            console.log('Loading chats from:', url);
             const resp = await fetch(url, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers: { Authorization: `Bearer ${token()}` },
             });
             if (!resp.ok) {
               let detail = '';
@@ -143,7 +188,7 @@ import '../styles/global.css';
             return;
           }
           chatList.innerHTML = chats.map(chat => {
-            const active = chat.id === selectedChatId ? ' chat-item-active' : '';
+            const active = chat.local_id === selectedChatId ? ' chat-item-active' : '';
             return `<button class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}">
               <span>${chat.name}</span>
               <small>#${chat.local_id}</small>
@@ -152,17 +197,173 @@ import '../styles/global.css';
 
           chatList.querySelectorAll('.chat-item').forEach(btn => {
             btn.addEventListener('click', () => {
-              selectedChatId = Number(btn.dataset.chatId);
-              const localId = btn.dataset.localId;
+              const chatId = Number(btn.dataset.chatId);
+              const localId = Number(btn.dataset.localId);
               const chatName = btn.querySelector('span')?.textContent || 'Chat';
-
-              if (chatTitle) chatTitle.textContent = chatName;
-              if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
-
-              chatList.querySelectorAll('.chat-item').forEach(c => c.classList.remove('chat-item-active'));
-              btn.classList.add('chat-item-active');
+              selectChat(chatId, localId, chatName);
             });
           });
+        }
+
+        function selectChat(chatId, localId, chatName) {
+          selectedChatId = localId;
+          if (chatTitle) chatTitle.textContent = chatName;
+          if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
+          chatList.querySelectorAll('.chat-item').forEach(c => c.classList.remove('chat-item-active'));
+          const activeBtn = chatList.querySelector(`[data-local-id="${localId}"]`);
+          if (activeBtn) activeBtn.classList.add('chat-item-active');
+          if (composer) composer.hidden = false;
+          setStatus('');
+          loadMessages(localId);
+        }
+
+        async function loadMessages(chatId) {
+          if (!messageStream) return;
+          try {
+            const url = `${API_BASE}/chats/${chatId}/messages?user_id=${user.id}&limit=50`;
+            const resp = await fetch(url, {
+              headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
+            const messages = await resp.json();
+            renderMessages(messages);
+          } catch (err) {
+            console.error('Load messages error:', err);
+            if (messageStream) messageStream.innerHTML = `<div class="empty-state"><h3>Error</h3><p>Failed to load messages: ${err.message}</p></div>`;
+          }
+        }
+
+        function renderMessages(messages) {
+          if (!messageStream) return;
+          if (!messages || messages.length === 0) {
+            messageStream.innerHTML = `<div class="empty-state"><h3>Start a conversation</h3><p>Ask a question about your notes to get started.</p></div>`;
+            return;
+          }
+          messageStream.innerHTML = messages.map(msg => `
+            <div class="turn">
+              <div class="bubble bubble-user">
+                <p class="bubble-label">You</p>
+                <p>${escapeHtml(msg.user_message)}</p>
+              </div>
+              <div class="bubble bubble-bot">
+                <p class="bubble-label">Assistant</p>
+                <p>${escapeHtml(msg.bot_response)}</p>
+              </div>
+            </div>
+          `).join('');
+          messageStream.scrollTop = messageStream.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+
+        async function sendQuery() {
+          if (!queryInput || !selectedChatId) return;
+          const request = queryInput.value.trim();
+          if (!request) return;
+
+          queryInput.value = '';
+          setStatus('Thinking...', 'warning');
+          sendBtn.disabled = true;
+
+          if (messageStream) {
+            const emptyState = messageStream.querySelector('.empty-state');
+            if (emptyState) messageStream.innerHTML = '';
+            messageStream.insertAdjacentHTML('beforeend', `
+              <div class="turn" id="pending-turn">
+                <div class="bubble bubble-user">
+                  <p class="bubble-label">You</p>
+                  <p>${escapeHtml(request)}</p>
+                </div>
+                <div class="bubble bubble-bot">
+                  <p class="bubble-label">Assistant</p>
+                  <p>Thinking...</p>
+                </div>
+              </div>
+            `);
+            messageStream.scrollTop = messageStream.scrollHeight;
+          }
+
+          try {
+            const resp = await fetch(`${API_BASE}/chats/query?user_id=${user.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token()}`,
+              },
+              body: JSON.stringify({ chat_id: selectedChatId, request }),
+            });
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
+            const data = await resp.json();
+            const pendingTurn = document.getElementById('pending-turn');
+            if (pendingTurn) {
+              const botBubble = pendingTurn.querySelector('.bubble-bot p:last-child');
+              if (botBubble) botBubble.textContent = data.answer;
+              pendingTurn.id = '';
+            }
+            setStatus('', 'success');
+          } catch (err) {
+            console.error('Query error:', err);
+            const pendingTurn = document.getElementById('pending-turn');
+            if (pendingTurn) {
+              const botBubble = pendingTurn.querySelector('.bubble-bot p:last-child');
+              if (botBubble) botBubble.textContent = `Error: ${err.message}`;
+              pendingTurn.id = '';
+            }
+            setStatus('Query failed', 'danger');
+          } finally {
+            sendBtn.disabled = false;
+            if (messageStream) messageStream.scrollTop = messageStream.scrollHeight;
+          }
+        }
+
+        async function uploadFile(file) {
+          if (!file || !selectedChatId) return;
+          if (file.type !== 'application/pdf') {
+            setStatus('Only PDF files are supported', 'danger');
+            return;
+          }
+          setStatus(`Uploading ${file.name}...`, 'warning');
+          uploadBtn.disabled = true;
+          try {
+            const formData = new FormData();
+            formData.append('files', file);
+            const url = `${API_BASE}/documents/ingest?user_id=${user.id}&chat_id=${selectedChatId}`;
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token()}` },
+              body: formData,
+            });
+            if (!resp.ok) {
+              let detail = '';
+              try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              throw new Error(`${resp.status}: ${detail}`);
+            }
+            const results = await resp.json();
+            const r = results[0];
+            if (r.status === 'embedded and stored') {
+              setStatus(`Uploaded ${file.name} — ${r.chunks_count} chunks indexed`, 'success');
+            } else {
+              setStatus(`Upload issue: ${r.status}`, 'warning');
+            }
+            fileInput.value = '';
+          } catch (err) {
+            console.error('Upload error:', err);
+            setStatus(`Upload failed: ${err.message}`, 'danger');
+          } finally {
+            uploadBtn.disabled = false;
+          }
         }
 
         chatForm?.addEventListener('submit', async (ev) => {
@@ -171,14 +372,12 @@ import '../styles/global.css';
           if (!name) return;
 
           try {
-            const token = localStorage.getItem('access_token');
             const url = `${API_BASE}/chats/?user_id=${user.id}`;
-            console.log('Creating chat:', { url, token: token?.slice(0,20) + '...', name });
             const resp = await fetch(url, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${token()}`,
               },
               body: JSON.stringify({ name }),
             });
@@ -192,6 +391,33 @@ import '../styles/global.css';
           } catch (err) {
             console.error('Chat creation error:', err);
             alert('Error creating chat: ' + (err?.message || err));
+          }
+        });
+
+        sendBtn?.addEventListener('click', sendQuery);
+        queryInput?.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' && !ev.shiftKey) {
+            ev.preventDefault();
+            sendQuery();
+          }
+        });
+
+        toggleUpload?.addEventListener('click', () => {
+          if (!composerUpload) return;
+          composerUpload.hidden = !composerUpload.hidden;
+          toggleUpload.textContent = composerUpload.hidden ? '+' : '−';
+        });
+
+        dropzoneLabel?.addEventListener('click', () => fileInput?.click());
+        fileInput?.addEventListener('change', () => {
+          if (fileInput.files && fileInput.files[0]) {
+            uploadFile(fileInput.files[0]);
+          }
+        });
+
+        uploadBtn?.addEventListener('click', () => {
+          if (fileInput.files && fileInput.files[0]) {
+            uploadFile(fileInput.files[0]);
           }
         });
 
