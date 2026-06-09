@@ -319,7 +319,7 @@ import '../styles/global.css';
         }
 
         function selectChat(chatId, localId, chatName) {
-          selectedChatId = chatId;
+          selectedChatId = localId;
           if (chatTitle) chatTitle.textContent = chatName;
           if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
           if (flashcardChatPill) flashcardChatPill.textContent = `#${localId} ${chatName}`;
@@ -330,7 +330,7 @@ import '../styles/global.css';
           setStatus('');
           resetSummary();
           clearFlashcards();
-          loadMessages(chatId);
+          loadMessages(localId);
         }
 
         async function loadMessages(chatId) {
