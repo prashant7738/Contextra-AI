@@ -8,7 +8,8 @@ import logging
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.schemas.user import UserResponse
-from app.schemas.document import IngestionResponse
+from app.schemas.document import IngestionResponse, DocumentResponse
+from app.models.document import Document
 from app.services.ingestion_service import ingest_text
 from app.services.document_service import create_document
 from app.core.ocr import extract_text_hybrid
@@ -17,6 +18,23 @@ from app.core.ocr import extract_text_hybrid
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+@router.get("/", response_model=List[DocumentResponse])
+def list_documents_for_chat(user_id: int, chat_id: int, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
+    """
+    List documents attached to a chat for the current user.
+    """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+
+    # Query documents for this chat and user
+    docs = db.query(Document).filter(
+        Document.user_id == user_id,
+        Document.chat_id == chat_id
+    ).all()
+
+    return [DocumentResponse.model_validate(d) for d in docs]
 
 
 @router.post("/ingest", response_model=List[IngestionResponse])

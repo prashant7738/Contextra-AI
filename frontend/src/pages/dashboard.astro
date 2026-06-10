@@ -347,7 +347,7 @@ import '../styles/global.css';
           });
         }
 
-        function selectChat(chatId, localId, chatName, createdAt) {
+        async function selectChat(chatId, localId, chatName, createdAt) {
           selectedChatId = localId;
           if (chatTitle) chatTitle.textContent = chatName;
           // remove numeric ID prefixes — show name (date is visible in the left rail)
@@ -366,7 +366,15 @@ import '../styles/global.css';
           setStatus('');
           resetSummary();
           clearFlashcards();
-          loadMessages(localId);
+          await loadMessages(localId);
+
+          // After messages load, move view to composer and focus input
+          try {
+            if (composer) composer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            if (queryInput) queryInput.focus();
+          } catch (e) {
+            /* ignore */
+          }
         }
 
         async function loadMessages(chatId) {
@@ -382,14 +390,14 @@ import '../styles/global.css';
               throw new Error(`${resp.status}: ${detail}`);
             }
             const messages = await resp.json();
-            renderMessages(messages);
+            await renderMessages(messages, chatId);
           } catch (err) {
             console.error('Load messages error:', err);
             if (messageStream) messageStream.innerHTML = `<div class="empty-state"><h3>Error</h3><p>Failed to load messages: ${err.message}</p></div>`;
           }
         }
 
-        function renderMessages(messages) {
+        async function renderMessages(messages, chatId) {
           if (!messageStream) return;
           if (!messages || messages.length === 0) {
             messageStream.innerHTML = `<div class="empty-state"><h3>Start a conversation</h3><p>Ask a question about your notes to get started.</p></div>`;
@@ -411,6 +419,29 @@ import '../styles/global.css';
             </article>
           `).join('');
           messageStream.scrollTop = messageStream.scrollHeight;
+
+          // Fetch documents attached to this chat and render filenames at the bottom
+          try {
+            const docResp = await fetch(`${API_BASE}/documents/?user_id=${user.id}&chat_id=${chatId}`, {
+              headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (docResp.ok) {
+              const docs = await docResp.json();
+              if (docs && docs.length) {
+                const list = docs.map(d => `<li>${escapeHtml(d.filename)}</li>`).join('');
+                messageStream.insertAdjacentHTML('beforeend', `
+                  <div class="chat-documents" style="padding:12px;border-top:1px solid var(--line);background:transparent">
+                    <strong>Uploaded files</strong>
+                    <ul style="margin:8px 0 0;padding-left:18px">${list}</ul>
+                  </div>
+                `);
+                messageStream.scrollTop = messageStream.scrollHeight;
+              }
+            }
+          } catch (e) {
+            // ignore document fetch errors
+            console.debug('Could not fetch docs for chat', e);
+          }
         }
 
         function formatDate(iso) {
