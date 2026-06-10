@@ -210,7 +210,6 @@ export default function DetailedSummarizer() {
                     <span className={styles.cardTopic}>{result.topic || 'General'}</span>
                     <h3 className={styles.cardTitle}>{result.title || 'Untitled Summary'}</h3>
                     <div className={styles.cardMeta}>
-                      {result.chat_id && `Chat #${result.chat_id} · `}
                       {result.timestamp
                         ? new Date(result.timestamp).toLocaleDateString()
                         : 'Date unknown'}

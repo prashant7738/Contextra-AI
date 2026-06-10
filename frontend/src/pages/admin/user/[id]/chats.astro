@@ -29,7 +29,6 @@ import Layout from '../../../../components/AuthWrapper.jsx';
       chatsEl.innerHTML = chats.map(c => `
         <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
           <div style="font-weight:600">${c.name}</div>
-          <div style="font-size:13px;color:#667">ID: ${c.id}</div>
           <a href="/admin/chat/${c.id}/messages">View messages</a>
         </li>
       `).join('');

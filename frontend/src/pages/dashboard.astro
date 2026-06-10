@@ -320,29 +320,39 @@ import '../styles/global.css';
             chatList.innerHTML = '<p class="empty">No chats yet. Create one above.</p>';
             return;
           }
-          chatList.innerHTML = chats.map(chat => {
-            const active = chat.local_id === selectedChatId ? ' chat-item-active' : '';
-            return `<button class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}">
-              <span>${chat.name}</span>
-              <small>#${chat.local_id}</small>
-            </button>`;
-          }).join('');
+            // ensure newest-first by created date when available
+            chats.sort((a, b) => {
+              const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return db - da;
+            });
+
+            chatList.innerHTML = chats.map(chat => {
+              const active = chat.local_id === selectedChatId ? ' chat-item-active' : '';
+              const created = chat.created_at ? formatDate(chat.created_at) : '';
+              return `<button class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}" data-created-at="${chat.created_at || ''}">
+                <span>${chat.name}</span>
+                <small>${created}</small>
+              </button>`;
+            }).join('');
 
           chatList.querySelectorAll('.chat-item').forEach(btn => {
             btn.addEventListener('click', () => {
               const chatId = Number(btn.dataset.chatId);
               const localId = Number(btn.dataset.localId);
+              const createdAt = btn.dataset.createdAt || '';
               const chatName = btn.querySelector('span')?.textContent || 'Chat';
-              selectChat(chatId, localId, chatName);
+              selectChat(chatId, localId, chatName, createdAt);
             });
           });
         }
 
-        function selectChat(chatId, localId, chatName) {
+        function selectChat(chatId, localId, chatName, createdAt) {
           selectedChatId = localId;
           if (chatTitle) chatTitle.textContent = chatName;
-          if (summaryChatPill) summaryChatPill.textContent = `#${localId} ${chatName}`;
-          if (flashcardChatPill) flashcardChatPill.textContent = `#${localId} ${chatName}`;
+          // remove numeric ID prefixes — show name (date is visible in the left rail)
+          if (summaryChatPill) summaryChatPill.textContent = chatName;
+          if (flashcardChatPill) flashcardChatPill.textContent = chatName;
           chatList.querySelectorAll('.chat-item').forEach(c => c.classList.remove('chat-item-active'));
           const activeBtn = chatList.querySelector(`[data-local-id="${localId}"]`);
           if (activeBtn) activeBtn.classList.add('chat-item-active');
