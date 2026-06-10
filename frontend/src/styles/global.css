@@ -1114,6 +1114,96 @@ textarea {
   color: rgba(247, 242, 234, 0.72);
 }
 
+/* In-workspace flashcard overrides for improved contrast and visual polish */
+#flashcard-panel-container {
+  background: linear-gradient(180deg, rgba(250, 251, 249, 0.8), rgba(245, 247, 246, 0.9));
+  color: #0b2620;
+}
+
+#flashcard-panel-container .flashcard-head h3,
+#flashcard-panel-container .flashcard-head .eyebrow {
+  color: #0b2e27;
+}
+
+#flashcard-panel-container .flashcard-copy {
+  color: rgba(11, 38, 32, 0.8);
+}
+
+#flashcard-panel-container .flashcard-card {
+  background: linear-gradient(180deg, #ffffff, #fbfdfb);
+  border: 1px solid rgba(16, 24, 20, 0.06);
+  box-shadow: 0 14px 36px rgba(11, 38, 32, 0.06);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+#flashcard-panel-container .flashcard-card::before {
+  background: linear-gradient(135deg, rgba(125, 184, 163, 0.04), transparent 40%);
+}
+
+#flashcard-panel-container .flashcard-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 30px 60px rgba(11, 38, 32, 0.10);
+  border-color: rgba(125, 184, 163, 0.18);
+}
+
+#flashcard-panel-container .flashcard-summary-text {
+  color: rgba(11, 38, 32, 0.92);
+  font-size: 1rem;
+}
+
+#flashcard-panel-container .flashcard-topic {
+  color: #0b4236;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+#flashcard-panel-container .flashcard-badge {
+  background: linear-gradient(135deg, #d8a96d, #7db8a3);
+  color: #08221b;
+  box-shadow: 0 6px 18px rgba(125, 184, 163, 0.12);
+}
+
+#flashcard-panel-container .flashcard-hint {
+  background: #f0f9f5;
+  color: #0b4236;
+  border: 1px solid rgba(31, 61, 54, 0.06);
+}
+
+#flashcard-panel-container .flashcard-explanation {
+  color: rgba(8, 34, 29, 0.9);
+  background: linear-gradient(180deg, rgba(250,250,250,0), rgba(245,247,246,0.4));
+  padding-top: 12px;
+}
+
+#flashcard-panel-container .flashcard-sources li,
+#flashcard-panel-container .flashcard-sources small {
+  color: rgba(11, 38, 32, 0.8);
+}
+
+#flashcard-panel-container .flashcard-stat {
+  background: linear-gradient(90deg, rgba(125,184,163,0.04), rgba(216,169,109,0.03));
+  border: 1px solid rgba(11, 38, 32, 0.04);
+}
+
+#flashcard-panel-container .flashcard-stat strong {
+  color: #0b1010; /* near-black for high contrast */
+}
+
+/* Directly target the numeric counters for extra contrast */
+#flashcard-topic-count,
+#flashcard-count,
+#flashcard-chunk-count {
+  color: #0b1010;
+}
+
+#flashcard-panel-container .flashcard-stat span {
+  color: rgba(11, 16, 16, 0.66); /* dark label text under counts */
+}
+
+#flashcard-panel-container .flashcard-status {
+  color: rgba(11, 38, 32, 0.8);
+}
+
 .composer-bar {
   display: flex;
   align-items: center;
