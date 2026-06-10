@@ -179,6 +179,10 @@ import '../styles/global.css';
       </section>
     </main>
 
+    <!-- Markdown renderer + sanitizer for assistant responses -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
+
     <script>
       // @ts-nocheck
       const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
@@ -369,7 +373,7 @@ import '../styles/global.css';
                 </div>
                 <div class="bubble bubble-bot">
                   <p class="bubble-label">Assistant</p>
-                  <p>${escapeHtml(msg.bot_response)}</p>
+                  <div class="bot-content">${DOMPurify.sanitize(marked.parse(msg.bot_response || ''))}</div>
                 </div>
               </div>
             </article>
@@ -434,8 +438,8 @@ import '../styles/global.css';
             const data = await resp.json();
             const pendingTurn = document.getElementById('pending-turn');
             if (pendingTurn) {
-              const botBubble = pendingTurn.querySelector('.bubble-bot p:last-child');
-              if (botBubble) botBubble.textContent = data.answer;
+              const botBubble = pendingTurn.querySelector('.bubble-bot .bot-content');
+              if (botBubble) botBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.answer || ''));
               pendingTurn.id = '';
             }
             setStatus('', 'success');
