@@ -372,6 +372,12 @@ import '../styles/global.css';
           clearFlashcards();
           await loadMessages(localId);
 
+          // Always refresh the uploaded files list for the selected chat.
+          // loadMessages may return early for chats with no messages, so
+          // explicitly update the document list here to avoid showing
+          // files from the previously selected chat.
+          try { await renderChatDocuments(localId); } catch (e) { console.debug('Refresh docs on select failed', e); }
+
           // After messages load, move view to composer and focus input
           try {
             if (composer) composer.scrollIntoView({ behavior: 'smooth', block: 'end' });
