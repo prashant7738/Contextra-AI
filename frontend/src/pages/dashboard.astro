@@ -48,7 +48,9 @@ import '../styles/global.css';
           </div>
         </aside>
 
-        <button class="resize-handle" id="left-resize" type="button" aria-label="Resize left sidebar" title="Drag to resize left sidebar"></button>
+        <div class="resize-handle" id="left-resize" role="separator" aria-orientation="vertical" title="Drag to resize left sidebar">
+          <button id="left-toggle" class="rail-toggle" aria-label="Toggle left sidebar">‹</button>
+        </div>
 
         <section class="workspace panel">
           <header class="workspace-head">
@@ -89,7 +91,9 @@ import '../styles/global.css';
           </div>
         </section>
 
-        <button class="resize-handle" id="right-resize" type="button" aria-label="Resize right sidebar" title="Drag to resize right sidebar"></button>
+        <div class="resize-handle" id="right-resize" role="separator" aria-orientation="vertical" title="Drag to resize right sidebar">
+          <button id="right-toggle" class="rail-toggle" aria-label="Toggle right sidebar">›</button>
+        </div>
 
         <aside class="sidebar panel right-rail" id="right-rail">
           <details class="summary-disclosure" aria-live="polite" open>
@@ -735,8 +739,54 @@ import '../styles/global.css';
             window.addEventListener('pointerup', stopDrag);
           }
 
-          leftResize.addEventListener('pointerdown', () => startDrag('left'));
-          rightResize.addEventListener('pointerdown', () => startDrag('right'));
+          leftResize.addEventListener('pointerdown', (ev) => { if (ev.target.closest && ev.target.closest('.rail-toggle')) return; startDrag('left'); });
+          rightResize.addEventListener('pointerdown', (ev) => { if (ev.target.closest && ev.target.closest('.rail-toggle')) return; startDrag('right'); });
+
+          // Toggle controls for hiding/showing rails
+          const leftToggle = document.getElementById('left-toggle');
+          const rightToggle = document.getElementById('right-toggle');
+          const leftRailEl = document.getElementById('left-rail');
+          const rightRailEl = document.getElementById('right-rail');
+
+          function applyRailState() {
+            const l = localStorage.getItem('dashboard_left_collapsed') === '1';
+            const r = localStorage.getItem('dashboard_right_collapsed') === '1';
+            frameRails.classList.toggle('left-collapsed', l);
+            frameRails.classList.toggle('right-collapsed', r);
+            if (leftRailEl) leftRailEl.classList.toggle('collapsed', l);
+            if (rightRailEl) rightRailEl.classList.toggle('collapsed', r);
+            if (leftToggle) leftToggle.textContent = l ? '›' : '‹';
+            if (rightToggle) rightToggle.textContent = r ? '‹' : '›';
+            // set aria-expanded
+            if (leftToggle) leftToggle.setAttribute('aria-expanded', String(!l));
+            if (rightToggle) rightToggle.setAttribute('aria-expanded', String(!r));
+          }
+
+          function toggleLeftRail() {
+            const cur = localStorage.getItem('dashboard_left_collapsed') === '1';
+            localStorage.setItem('dashboard_left_collapsed', cur ? '0' : '1');
+            applyRailState();
+          }
+
+          function toggleRightRail() {
+            const cur = localStorage.getItem('dashboard_right_collapsed') === '1';
+            localStorage.setItem('dashboard_right_collapsed', cur ? '0' : '1');
+            applyRailState();
+          }
+
+          leftToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleLeftRail(); });
+          rightToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleRightRail(); });
+
+          // keyboard shortcuts: Alt+1 and Alt+2 (or Meta on Mac)
+          document.addEventListener('keydown', (ev) => {
+            if ((ev.altKey || ev.metaKey) && ev.key === '1') { ev.preventDefault(); toggleLeftRail(); }
+            if ((ev.altKey || ev.metaKey) && ev.key === '2') { ev.preventDefault(); toggleRightRail(); }
+          });
+
+          // initialize
+          if (localStorage.getItem('dashboard_left_collapsed') === null) localStorage.setItem('dashboard_left_collapsed', '0');
+          if (localStorage.getItem('dashboard_right_collapsed') === null) localStorage.setItem('dashboard_right_collapsed', '0');
+          applyRailState();
         }
 
         chatForm?.addEventListener('submit', async (ev) => {

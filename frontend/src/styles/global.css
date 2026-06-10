@@ -171,6 +171,56 @@ button {
   position: relative;
 }
 
+.rail-toggle {
+  display: inline-grid;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(31,61,54,0.06);
+  background: rgba(255,255,255,0.6);
+  font-size: 18px;
+  color: var(--accent);
+  transform: translateY(-50%);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  box-shadow: 0 6px 18px rgba(31,61,54,0.08);
+}
+
+.rail-toggle:focus {
+  outline: none;
+  box-shadow: 0 0 0 6px rgba(31,61,54,0.08);
+}
+
+/* Collapsed states: adjust grid columns when rails are hidden */
+.frame-rails.left-collapsed {
+  grid-template-columns: 8px minmax(0, 1fr) 8px minmax(300px, var(--right-width));
+}
+.frame-rails.right-collapsed {
+  grid-template-columns: minmax(260px, var(--left-width)) 8px minmax(0, 1fr) 8px;
+}
+.frame-rails.left-collapsed.right-collapsed {
+  grid-template-columns: 8px minmax(0, 1fr) 8px;
+}
+
+.left-rail.collapsed,
+.right-rail.collapsed {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0) scaleX(0.98);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.left-rail {
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+.right-rail {
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
 .resize-handle::before {
   content: '';
   position: absolute;
