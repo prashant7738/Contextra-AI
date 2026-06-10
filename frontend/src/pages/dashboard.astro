@@ -14,7 +14,7 @@ import '../styles/global.css';
       <div class="ambient ambient-one"></div>
       <div class="ambient ambient-two"></div>
 
-      <header class="topbar panel">
+      <header class="topbar panel" id="topbar">
         <div class="topbar-brand">
           <p class="eyebrow">Contextra AI</p>
           <h1>Study cockpit</h1>
@@ -24,6 +24,8 @@ import '../styles/global.css';
             <span id="profile-avatar" class="profile-avatar">U</span>
             <span id="profile-name">User</span>
           </div>
+          <button id="summarizer-btn" class="button button-ghost" type="button" style="display:none">Summarizer</button>
+          <button id="flashcard-btn" class="button button-ghost" type="button" style="display:none">Flashcards</button>
           <button id="logout-btn" class="button button-ghost" type="button">Logout</button>
         </div>
       </header>
@@ -71,6 +73,102 @@ import '../styles/global.css';
             </div>
           </div>
 
+          <!-- Summary panel (replaces chat view when activated) -->
+          <div id="summary-panel-container" class="panel" hidden>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)">
+              <div>
+                <p class="eyebrow">Insight Layer</p>
+                <h3>Detailed summary</h3>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span id="summary-chat-pill" class="pill">No chat selected</span>
+                <button id="summary-close" class="button button-ghost" type="button">Back</button>
+              </div>
+            </div>
+            <div style="padding:18px">
+              <form id="summary-form" class="summary-controls">
+                <label class="field">
+                  <span>Topic focus</span>
+                  <input id="summary-topic" type="text" placeholder="all, chapter 3, architecture decisions..." autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Context chunks</span>
+                  <select id="summary-results">
+                    <option value="3">3 chunks</option>
+                    <option value="5" selected>5 chunks</option>
+                    <option value="10">10 chunks</option>
+                    <option value="15">15 chunks</option>
+                  </select>
+                </label>
+                <div class="summary-actions">
+                  <button id="summary-generate" class="button button-primary" type="submit">Generate</button>
+                  <button id="summary-clear" class="button button-ghost" type="button">Clear</button>
+                </div>
+              </form>
+              <div id="summary-output" class="summary-output" style="margin-top:16px">
+                <p class="empty">Generate a focused summary for the selected chat.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flashcard panel (replaces chat view when activated) -->
+          <div id="flashcard-panel-container" class="panel" hidden>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)">
+              <div>
+                <p class="eyebrow">Memory Layer</p>
+                <h3>Flashcards</h3>
+                <p class="flashcard-copy">Generate clean, topic-grouped recall cards from the selected chat.</p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span id="flashcard-chat-pill" class="pill">No chat selected</span>
+                <button id="flashcard-close" class="button button-ghost" type="button">Back</button>
+              </div>
+            </div>
+            <div style="padding:18px">
+              <div class="flashcard-head" style="display:flex;justify-content:space-between;align-items:center">
+                <div style="min-width:0">
+                  <div class="flashcard-stats" style="display:flex;gap:14px;margin-bottom:12px">
+                    <div class="flashcard-stat">
+                      <strong id="flashcard-topic-count">0</strong>
+                      <span>Topics</span>
+                    </div>
+                    <div class="flashcard-stat">
+                      <strong id="flashcard-count">0</strong>
+                      <span>Cards</span>
+                    </div>
+                    <div class="flashcard-stat">
+                      <strong id="flashcard-chunk-count">5</strong>
+                      <span>Chunks</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flashcard-actions">
+                  <button id="flashcard-generate" class="button button-primary" type="button">Generate</button>
+                </div>
+              </div>
+
+              <div class="summary-controls" style="margin-top:12px">
+                <label class="field">
+                  <span>Context chunks</span>
+                  <select id="flashcard-results">
+                    <option value="3">3 chunks</option>
+                    <option value="5" selected>5 chunks</option>
+                    <option value="10">10 chunks</option>
+                    <option value="15">15 chunks</option>
+                  </select>
+                </label>
+                <div class="summary-actions" style="margin-top:12px">
+                  <button id="flashcard-clear" class="button button-ghost" type="button">Clear</button>
+                </div>
+              </div>
+
+              <p id="flashcard-status" class="status-line flashcard-status" style="margin-top:12px"></p>
+              <div id="flashcard-output" class="flashcard-output" style="margin-top:12px">
+                <p class="empty">Generate flashcards to see learning cards here.</p>
+              </div>
+            </div>
+          </div>
+
           <div id="composer" class="composer" hidden>
             <div id="composer-upload" class="composer-upload" hidden>
               <label class="dropzone" id="dropzone-label" for="file-input">
@@ -91,95 +189,7 @@ import '../styles/global.css';
           </div>
         </section>
 
-        <div class="resize-handle" id="right-resize" role="separator" aria-orientation="vertical" title="Drag to resize right sidebar">
-          <button id="right-toggle" class="rail-toggle" aria-label="Toggle right sidebar">›</button>
-        </div>
-
-        <aside class="sidebar panel right-rail" id="right-rail">
-          <details class="summary-disclosure" aria-live="polite" open>
-            <summary class="disclosure-summary summary-head">
-              <div>
-                <p class="eyebrow">Insight Layer</p>
-                <h3>Detailed summary</h3>
-              </div>
-              <span id="summary-chat-pill" class="pill">No chat selected</span>
-            </summary>
-
-            <div class="disclosure-body summary-panel">
-              <form id="summary-form" class="summary-controls">
-                <label class="field">
-                  <span>Topic focus</span>
-                  <input id="summary-topic" type="text" placeholder="all, chapter 3, architecture decisions..." autocomplete="off" />
-                </label>
-                <label class="field">
-                  <span>Context chunks</span>
-                  <select id="summary-results">
-                    <option value="3">3 chunks</option>
-                    <option value="5" selected>5 chunks</option>
-                    <option value="10">10 chunks</option>
-                    <option value="15">15 chunks</option>
-                  </select>
-                </label>
-                <div class="summary-actions">
-                  <button id="summary-generate" class="button button-primary" type="submit">Generate</button>
-                  <button id="summary-clear" class="button button-ghost" type="button">Clear</button>
-                </div>
-              </form>
-              <div id="summary-output" class="summary-output">
-                <p class="empty">Generate a focused summary for the selected chat.</p>
-              </div>
-            </div>
-          </details>
-
-          <section class="flashcard-panel" aria-live="polite">
-            <div class="flashcard-head">
-              <div>
-                <p class="eyebrow">Memory Layer</p>
-                <h3>Flashcards</h3>
-                <p class="flashcard-copy">Generate clean, topic-grouped recall cards from the selected chat.</p>
-              </div>
-              <div class="flashcard-actions">
-                <span id="flashcard-chat-pill" class="pill">No chat selected</span>
-                <button id="flashcard-generate" class="button button-primary" type="button">Generate</button>
-              </div>
-            </div>
-            <div class="flashcard-stats">
-              <div class="flashcard-stat">
-                <strong id="flashcard-topic-count">0</strong>
-                <span>Topics</span>
-              </div>
-              <div class="flashcard-stat">
-                <strong id="flashcard-count">0</strong>
-                <span>Cards</span>
-              </div>
-              <div class="flashcard-stat">
-                <strong id="flashcard-chunk-count">5</strong>
-                <span>Chunks</span>
-              </div>
-            </div>
-
-            <div class="summary-controls">
-              <label class="field">
-                <span>Context chunks</span>
-                <select id="flashcard-results">
-                  <option value="3">3 chunks</option>
-                  <option value="5" selected>5 chunks</option>
-                  <option value="10">10 chunks</option>
-                  <option value="15">15 chunks</option>
-                </select>
-              </label>
-              <div></div>
-              <div class="summary-actions">
-                <button id="flashcard-clear" class="button button-ghost" type="button">Clear</button>
-              </div>
-            </div>
-
-            <p id="flashcard-status" class="status-line flashcard-status"></p>
-            <div id="flashcard-output" class="flashcard-output">
-              <p class="empty">Generate flashcards to see learning cards here.</p>
-            </div>
-          </section>
-        </aside>
+        <!-- Right rail removed: panels moved into workspace when activated -->
       </section>
     </main>
 
@@ -218,6 +228,9 @@ import '../styles/global.css';
         const profileName = document.getElementById('profile-name');
         const profileAvatar = document.getElementById('profile-avatar');
         const logoutBtn = document.getElementById('logout-btn');
+        const summarizerBtn = document.getElementById('summarizer-btn');
+        const flashcardBtn = document.getElementById('flashcard-btn');
+        const topbar = document.getElementById('topbar');
         const summaryChatPill = document.getElementById('summary-chat-pill');
         const flashcardChatPill = document.getElementById('flashcard-chat-pill');
         const messageStream = document.getElementById('message-stream');
@@ -249,7 +262,6 @@ import '../styles/global.css';
 
         const frameRails = document.getElementById('frame-rails');
         const leftResize = document.getElementById('left-resize');
-        const rightResize = document.getElementById('right-resize');
 
         if (identityPill) {
           identityPill.textContent = user.name;
@@ -335,6 +347,12 @@ import '../styles/global.css';
           const activeBtn = chatList.querySelector(`[data-local-id="${localId}"]`);
           if (activeBtn) activeBtn.classList.add('chat-item-active');
           if (composer) composer.hidden = false;
+          // enable topbar action buttons and fix the topbar for chat context
+          try { updateTopbarButtons(); } catch (e) {}
+          if (topbar) {
+            topbar.classList.add('fixed');
+            document.body.classList.add('has-fixed-topbar');
+          }
           setStatus('');
           resetSummary();
           clearFlashcards();
@@ -697,12 +715,10 @@ import '../styles/global.css';
         }
 
         function setupResizableRails() {
-          if (!frameRails || !leftResize || !rightResize) return;
+          if (!frameRails || !leftResize) return;
 
           const storedLeft = Number(localStorage.getItem('dashboard_left_width') || 320);
-          const storedRight = Number(localStorage.getItem('dashboard_right_width') || 380);
           frameRails.style.setProperty('--left-width', `${Math.max(260, Math.min(460, storedLeft))}px`);
-          frameRails.style.setProperty('--right-width', `${Math.max(300, Math.min(540, storedRight))}px`);
 
           let activeSide = null;
 
@@ -713,18 +729,12 @@ import '../styles/global.css';
               const next = Math.max(260, Math.min(460, ev.clientX - rect.left));
               frameRails.style.setProperty('--left-width', `${next}px`);
             }
-            if (activeSide === 'right') {
-              const next = Math.max(300, Math.min(540, rect.right - ev.clientX));
-              frameRails.style.setProperty('--right-width', `${next}px`);
-            }
           }
 
           function stopDrag() {
             if (!activeSide) return;
             const left = frameRails.style.getPropertyValue('--left-width').replace('px', '');
-            const right = frameRails.style.getPropertyValue('--right-width').replace('px', '');
             localStorage.setItem('dashboard_left_width', left);
-            localStorage.setItem('dashboard_right_width', right);
             document.body.classList.remove('is-resizing');
             activeSide = null;
             window.removeEventListener('pointermove', onMove);
@@ -740,26 +750,17 @@ import '../styles/global.css';
           }
 
           leftResize.addEventListener('pointerdown', (ev) => { if (ev.target.closest && ev.target.closest('.rail-toggle')) return; startDrag('left'); });
-          rightResize.addEventListener('pointerdown', (ev) => { if (ev.target.closest && ev.target.closest('.rail-toggle')) return; startDrag('right'); });
 
-          // Toggle controls for hiding/showing rails
+          // Toggle controls for hiding/showing left rail
           const leftToggle = document.getElementById('left-toggle');
-          const rightToggle = document.getElementById('right-toggle');
           const leftRailEl = document.getElementById('left-rail');
-          const rightRailEl = document.getElementById('right-rail');
 
           function applyRailState() {
             const l = localStorage.getItem('dashboard_left_collapsed') === '1';
-            const r = localStorage.getItem('dashboard_right_collapsed') === '1';
             frameRails.classList.toggle('left-collapsed', l);
-            frameRails.classList.toggle('right-collapsed', r);
             if (leftRailEl) leftRailEl.classList.toggle('collapsed', l);
-            if (rightRailEl) rightRailEl.classList.toggle('collapsed', r);
             if (leftToggle) leftToggle.textContent = l ? '›' : '‹';
-            if (rightToggle) rightToggle.textContent = r ? '‹' : '›';
-            // set aria-expanded
             if (leftToggle) leftToggle.setAttribute('aria-expanded', String(!l));
-            if (rightToggle) rightToggle.setAttribute('aria-expanded', String(!r));
           }
 
           function toggleLeftRail() {
@@ -768,24 +769,14 @@ import '../styles/global.css';
             applyRailState();
           }
 
-          function toggleRightRail() {
-            const cur = localStorage.getItem('dashboard_right_collapsed') === '1';
-            localStorage.setItem('dashboard_right_collapsed', cur ? '0' : '1');
-            applyRailState();
-          }
-
           leftToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleLeftRail(); });
-          rightToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleRightRail(); });
 
-          // keyboard shortcuts: Alt+1 and Alt+2 (or Meta on Mac)
+          // keyboard shortcut: Alt+1 (or Meta)
           document.addEventListener('keydown', (ev) => {
             if ((ev.altKey || ev.metaKey) && ev.key === '1') { ev.preventDefault(); toggleLeftRail(); }
-            if ((ev.altKey || ev.metaKey) && ev.key === '2') { ev.preventDefault(); toggleRightRail(); }
           });
 
-          // initialize
           if (localStorage.getItem('dashboard_left_collapsed') === null) localStorage.setItem('dashboard_left_collapsed', '0');
-          if (localStorage.getItem('dashboard_right_collapsed') === null) localStorage.setItem('dashboard_right_collapsed', '0');
           applyRailState();
         }
 
@@ -890,6 +881,44 @@ import '../styles/global.css';
         });
 
         refreshBtn?.addEventListener('click', loadChats);
+
+        // show summarizer/flashcard buttons only when a chat is selected
+        function updateTopbarButtons() {
+          const hasChat = Boolean(selectedChatId);
+          if (summarizerBtn) summarizerBtn.style.display = hasChat ? '' : 'none';
+          if (flashcardBtn) flashcardBtn.style.display = hasChat ? '' : 'none';
+        }
+
+        // open/close panels replacing chat view
+        const summaryPanel = document.getElementById('summary-panel-container');
+        const flashcardPanel = document.getElementById('flashcard-panel-container');
+        const summaryClose = document.getElementById('summary-close');
+        const flashcardClose = document.getElementById('flashcard-close');
+
+        function showSummaryPanel() {
+          if (!summaryPanel) return;
+          messageStream.style.display = 'none';
+          summaryPanel.hidden = false;
+          flashcardPanel.hidden = true;
+        }
+
+        function showFlashcardPanel() {
+          if (!flashcardPanel) return;
+          messageStream.style.display = 'none';
+          flashcardPanel.hidden = false;
+          summaryPanel.hidden = true;
+        }
+
+        function closePanels() {
+          if (summaryPanel) summaryPanel.hidden = true;
+          if (flashcardPanel) flashcardPanel.hidden = true;
+          messageStream.style.display = '';
+        }
+
+        summarizerBtn?.addEventListener('click', () => { showSummaryPanel(); });
+        flashcardBtn?.addEventListener('click', () => { showFlashcardPanel(); });
+        summaryClose?.addEventListener('click', () => { closePanels(); });
+        flashcardClose?.addEventListener('click', () => { closePanels(); });
 
         setupResizableRails();
         loadChats();
