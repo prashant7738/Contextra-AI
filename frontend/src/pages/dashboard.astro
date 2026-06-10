@@ -185,6 +185,10 @@ import '../styles/global.css';
               <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
               <button id="send-btn" class="button button-primary" type="button">Send</button>
             </div>
+            <div id="chat-doc-list" class="chat-doc-list" style="padding:10px 18px;border-top:1px solid var(--line);background:transparent;display:none">
+              <strong>Uploaded files</strong>
+              <ul id="chat-doc-list-items" style="margin:8px 0 0;padding-left:18px"></ul>
+            </div>
             <p id="status-line" class="status-line"></p>
           </div>
         </section>
@@ -420,27 +424,35 @@ import '../styles/global.css';
           `).join('');
           messageStream.scrollTop = messageStream.scrollHeight;
 
-          // Fetch documents attached to this chat and render filenames at the bottom
+          // Update composer-area document list as well
+          renderChatDocuments(chatId).catch(e => console.debug('Could not render chat documents', e));
+        }
+
+        async function renderChatDocuments(chatId) {
+          const listEl = document.getElementById('chat-doc-list-items');
+          const container = document.getElementById('chat-doc-list');
+          if (!listEl || !container) return;
           try {
             const docResp = await fetch(`${API_BASE}/documents/?user_id=${user.id}&chat_id=${chatId}`, {
               headers: { Authorization: `Bearer ${token()}` },
             });
-            if (docResp.ok) {
-              const docs = await docResp.json();
-              if (docs && docs.length) {
-                const list = docs.map(d => `<li>${escapeHtml(d.filename)}</li>`).join('');
-                messageStream.insertAdjacentHTML('beforeend', `
-                  <div class="chat-documents" style="padding:12px;border-top:1px solid var(--line);background:transparent">
-                    <strong>Uploaded files</strong>
-                    <ul style="margin:8px 0 0;padding-left:18px">${list}</ul>
-                  </div>
-                `);
-                messageStream.scrollTop = messageStream.scrollHeight;
-              }
+            if (!docResp.ok) {
+              listEl.innerHTML = '';
+              container.style.display = 'none';
+              return;
             }
-          } catch (e) {
-            // ignore document fetch errors
-            console.debug('Could not fetch docs for chat', e);
+            const docs = await docResp.json();
+            if (!docs || docs.length === 0) {
+              listEl.innerHTML = '';
+              container.style.display = 'none';
+              return;
+            }
+            listEl.innerHTML = docs.map(d => `<li>${escapeHtml(d.filename)}</li>`).join('');
+            container.style.display = '';
+          } catch (err) {
+            console.debug('Error fetching docs for chat', err);
+            listEl.innerHTML = '';
+            container.style.display = 'none';
           }
         }
 
@@ -553,6 +565,8 @@ import '../styles/global.css';
             }
             fileInput.value = '';
             selectedUploadFile = null;
+            // refresh document list for this chat
+            try { if (selectedChatId) await renderChatDocuments(selectedChatId); } catch(e) { console.debug('Refresh docs after upload failed', e); }
           } catch (err) {
             console.error('Upload error:', err);
             setStatus(`Upload failed: ${err.message}`, 'danger');

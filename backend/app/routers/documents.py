@@ -13,6 +13,7 @@ from app.models.document import Document
 from app.services.ingestion_service import ingest_text
 from app.services.document_service import create_document
 from app.core.ocr import extract_text_hybrid
+from app.repositories import chat_repository
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -28,10 +29,15 @@ def list_documents_for_chat(user_id: int, chat_id: int, db: Session = Depends(ge
     if user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
 
-    # Query documents for this chat and user
+    # Resolve chat (chat_id is the user's local_id) -> get global chat.id
+    chat = chat_repository.get_chat_for_user(db, chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    # Query documents for this chat (use global chat.id)
     docs = db.query(Document).filter(
         Document.user_id == user_id,
-        Document.chat_id == chat_id
+        Document.chat_id == chat.id
     ).all()
 
     return [DocumentResponse.model_validate(d) for d in docs]
