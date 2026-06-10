@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.chat import Chat
+from app.models.chat import Chat, ChatMessage
 
 
 def get_chat_by_id(db: Session, chat_id: int) -> Chat | None:
@@ -41,6 +41,8 @@ def delete_chat(db: Session, chat_id: int, user_id: int) -> bool:
     ).first()
     if chat is None:
         return False
+    # remove all messages that reference this chat to avoid FK violations
+    db.query(ChatMessage).filter(ChatMessage.chat_id == chat.id).delete()
     db.delete(chat)
     db.commit()
     return True

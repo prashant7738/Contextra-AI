@@ -451,6 +451,135 @@ textarea {
   text-align: left;
 }
 
+.chat-item {
+  position: relative;
+}
+
+.chat-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+
+.chat-select span {
+  display: inline-block;
+}
+
+.chat-menu {
+  border: 0;
+  background: transparent;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.chat-menu:hover {
+  background: rgba(31,61,54,0.04);
+  color: var(--accent);
+}
+
+.chat-actions-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 800;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(31,61,54,0.08);
+  min-width: 120px;
+}
+
+.chat-actions-menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.chat-actions-menu button:hover {
+  background: rgba(31,61,54,0.04);
+}
+
+/* Modal styles for confirm/rename dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 11, 10, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+}
+.modal-backdrop[open] {
+  display: flex;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: min(540px, 92%);
+  box-shadow: 0 20px 50px rgba(31,61,54,0.18);
+  border: 1px solid var(--line);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-title {
+  margin: 0;
+  font-weight: 700;
+}
+.modal-body {
+  margin-top: 12px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.modal .input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 0;
+}
+.modal-error {
+  color: var(--danger);
+  font-size: 0.95rem;
+  margin-top: 8px;
+}
+
 .choice span,
 .chat-item span {
   font-weight: 500;

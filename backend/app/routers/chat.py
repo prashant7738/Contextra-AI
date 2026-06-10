@@ -24,6 +24,7 @@ from app.services.chat_service import (
     get_chat,
     delete_chat,
 )
+from app.services.chat_service import update_chat_name
 from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards
 from app.repositories import message_repository
 
@@ -107,10 +108,28 @@ def delete_user_chat(chat_id: int, user_id: int, db: Session = Depends(get_db), 
     """
     if user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    # Log delete attempt for debugging (shows local_id and user)
+    print(f"Attempting delete: chat_id={chat_id}, user_id={user_id}, current_user.id={current_user.id}")
+    # Verify chat exists before deletion to provide clearer logs
+    chat = get_chat(db, chat_id, user_id)
+    print("Found chat for deletion:", bool(chat))
     deleted = delete_chat(db, chat_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
     return {"ok": True}
+
+
+@router.patch("/{chat_id}", response_model=ChatResponse)
+def patch_user_chat(chat_id: int, user_id: int, data: ChatCreate, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
+    """
+    Update a chat's name (verify ownership).
+    """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    updated = update_chat_name(db, chat_id, user_id, data.name)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+    return updated
 
 
 @router.post("/query", response_model=QueryResponse)
