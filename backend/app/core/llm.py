@@ -19,7 +19,7 @@ def get_llm() -> InferenceClient:
     return _chat_client
 
 
-def _ask_llm_sync(context: str, question: str, max_tokens: int = 500) -> str:
+def _ask_llm_sync(context: str, question: str, max_tokens: int = 2000) -> str:
     """Synchronous LLM call - runs in thread pool."""
     client = get_llm()
     prompt = f"""
@@ -39,7 +39,7 @@ Question: {question}
     return response.choices[0].message.content
 
 
-async def ask_llm(context: str, question: str, max_tokens: int = 500) -> str:
+async def ask_llm(context: str, question: str, max_tokens: int = 2000) -> str:
     """Async wrapper for LLM call - runs in thread pool to avoid blocking."""
     return await asyncio.to_thread(_ask_llm_sync, context, question, max_tokens)
 
