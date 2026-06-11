@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, UploadFile, Depends, HTTPException, File, Query
+from fastapi import APIRouter, UploadFile, Depends, HTTPException, File, Query
 from sqlalchemy.orm import Session
 import fitz
 import logging
@@ -24,15 +24,6 @@ def _strip_nul_chars(text: str) -> str:
     if not text:
         return ""
     return text.replace("\x00", "")
-
-
-def _background_ingest(pages_data: list, user_id: int, document_id: int, chat_id: int):
-    """Run chunking + embedding + vector storage in the background."""
-    try:
-        count = ingest_text(pages_data, user_id=user_id, document_id=document_id, chat_id=chat_id)
-        logger.info(f"Background ingestion complete: {count} chunks for document {document_id}")
-    except Exception as e:
-        logger.error(f"Background ingestion failed for document {document_id}: {str(e)}")
 
 
 @router.get("/", response_model=List[DocumentResponse])
@@ -60,7 +51,6 @@ def list_documents_for_chat(
 
 @router.post("/ingest", response_model=List[IngestionResponse])
 async def file_input(
-    background_tasks: BackgroundTasks,
     files: Optional[List[UploadFile]] = File(default=None),
     file: Optional[UploadFile] = File(default=None),
     user_id: int = Query(...),
@@ -74,8 +64,6 @@ async def file_input(
 
     - use_ocr=false (default): fast path, fitz only — suitable for all text-based PDFs
     - use_ocr=true: hybrid fitz+OCR — use only for scanned/image PDFs
-    
-    Text extraction is synchronous; embedding/vector storage runs in background.
     """
     uploaded_files: List[UploadFile] = []
     if files:
@@ -118,17 +106,17 @@ async def file_input(
                 f"{extraction_stats['ocr']} ocr, {extraction_stats['failed']} failed"
             )
 
-            # Sync: create DB record (fast)
+            # Create document record in database
             document = create_document(db, user_id, chat_id, upload.filename, full_text)
 
-            # Async: chunk + embed + store in vector DB
-            background_tasks.add_task(
-                _background_ingest, pages_data, user_id, document.id, document.chat_id
-            )
+            # Ingest into vector database (chunking + embedding + storage)
+            chunks_count = ingest_text(pages_data, user_id=user_id, document_id=document.id, chat_id=document.chat_id)
+
+            logger.info(f"Document {document.id} ingested: {chunks_count} chunks created")
 
             results.append(IngestionResponse(
-                chunks_count=0,
-                status="ingestion_queued",
+                chunks_count=chunks_count,
+                status="embedded and stored",
                 document_id=document.id,
                 chat_id=chat_id,
                 extraction_stats=extraction_stats

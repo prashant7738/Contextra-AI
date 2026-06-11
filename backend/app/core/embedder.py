@@ -4,19 +4,12 @@ _model: SentenceTransformer | None = None
 _MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
-def _get_device() -> str:
-    try:
-        import torch
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    except ImportError:
-        return "cpu"
-
-
 def get_embedder() -> SentenceTransformer:
     global _model
     if _model is None:
-        device = _get_device()
-        _model = SentenceTransformer(_MODEL_NAME, device=device)
+        # CPU-only mode to avoid CUDA kernel compatibility issues
+        # To enable GPU: install correct CUDA toolkit version matching your GPU, then set device="cuda"
+        _model = SentenceTransformer(_MODEL_NAME, device="cpu")
     return _model
 
 

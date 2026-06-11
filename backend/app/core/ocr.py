@@ -15,23 +15,14 @@ logger = logging.getLogger(__name__)
 _ocr_reader = None
 
 
-def _is_gpu_available() -> bool:
-    try:
-        import torch
-        return torch.cuda.is_available()
-    except ImportError:
-        return False
-
-
 def get_ocr_reader():
     global _ocr_reader
     if _ocr_reader is None:
         try:
             import easyocr
-            gpu = _is_gpu_available()
-            logger.info(f"Initializing EasyOCR reader ({'GPU' if gpu else 'CPU'} mode)...")
-            _ocr_reader = easyocr.Reader(['en'], gpu=gpu)
-            logger.info(f"EasyOCR reader initialized ({'GPU' if gpu else 'CPU'})")
+            logger.info("Initializing EasyOCR reader (CPU mode - GPU disabled due to CUDA compatibility issues)...")
+            _ocr_reader = easyocr.Reader(['en'], gpu=False)
+            logger.info("EasyOCR reader initialized (CPU mode)")
         except ImportError:
             logger.warning("EasyOCR not installed - OCR unavailable")
             _ocr_reader = None
