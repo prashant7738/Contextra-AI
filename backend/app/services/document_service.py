@@ -3,6 +3,12 @@ from app.models.document import Document
 from app.repositories import user_repository, chat_repository
 
 
+def _strip_nul_chars(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("\x00", "")
+
+
 def create_document(db: Session, user_id: int, chat_id: int, filename: str, content: str = None) -> Document:
     """
     Create a new document record in the database.
@@ -34,8 +40,8 @@ def create_document(db: Session, user_id: int, chat_id: int, filename: str, cont
     doc = Document(
         user_id=user_id,
         chat_id=chat.id,
-        filename=filename,
-        content=content or ""
+        filename=_strip_nul_chars(filename) or "unknown",
+        content=_strip_nul_chars(content)
     )
     db.add(doc)
     db.commit()

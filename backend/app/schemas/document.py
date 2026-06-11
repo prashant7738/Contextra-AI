@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -12,6 +14,6 @@ class DocumentResponse(BaseModel):
 class IngestionResponse(BaseModel):
     chunks_count: int
     status: str
-    document_id: int = None
-    chat_id: int = None
-    extraction_stats: dict = None  # Shows {fitz: X, ocr: Y, failed: Z}
+    document_id: Optional[int] = None
+    chat_id: Optional[int] = None
+    extraction_stats: Optional[dict] = None  # Shows {fitz: X, ocr: Y, failed: Z}

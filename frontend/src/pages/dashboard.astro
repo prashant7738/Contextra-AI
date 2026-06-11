@@ -16,6 +16,11 @@ import '../styles/global.css';
 
       <header class="topbar panel" id="topbar">
         <div class="topbar-brand">
+          <button id="mobile-hamburger" class="mobile-hamburger" aria-label="Open menu" aria-expanded="false">
+            <span class="mh-bar"></span>
+            <span class="mh-bar"></span>
+            <span class="mh-bar"></span>
+          </button>
           <p class="eyebrow">Contextra AI</p>
           <h1>Study cockpit</h1>
         </div>
@@ -23,9 +28,16 @@ import '../styles/global.css';
           <div id="profile-pill" class="profile-pill" aria-live="polite">
             <span id="profile-avatar" class="profile-avatar">U</span>
             <span id="profile-name">User</span>
+            <button id="mobile-caret" class="mobile-caret" type="button" aria-expanded="false">▾</button>
+
+            <div id="mobile-profile-menu" class="mobile-profile-menu" hidden>
+              <button id="mobile-summarizer" class="button button-ghost" type="button">Summarizer</button>
+              <button id="mobile-flashcard" class="button button-ghost" type="button">Flashcards</button>
+              <button id="mobile-logout" class="button button-ghost" type="button">Logout</button>
+            </div>
           </div>
-          <button id="summarizer-btn" class="button button-ghost" type="button" style="display:none">Summarizer</button>
-          <button id="flashcard-btn" class="button button-ghost" type="button" style="display:none">Flashcards</button>
+          <button id="summarizer-btn" class="button button-ghost" type="button">Summarizer</button>
+          <button id="flashcard-btn" class="button button-ghost" type="button">Flashcards</button>
           <button id="logout-btn" class="button button-ghost" type="button">Logout</button>
         </div>
       </header>
@@ -34,6 +46,11 @@ import '../styles/global.css';
         <aside class="sidebar panel left-rail" id="left-rail">
           <div class="brand-block">
             <p class="eyebrow">Workspace</p>
+            <button id="mobile-chat-toggle" class="mobile-chat-toggle" type="button" aria-label="Open chats" aria-expanded="false">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </button>
             <h2>Quiet chat workspace</h2>
           </div>
 
@@ -216,6 +233,24 @@ import '../styles/global.css';
       </div>
     </div>
 
+    <!-- Mobile full-screen overlay for menu (mobile only) -->
+    <div id="mobile-overlay" class="mobile-overlay" hidden>
+      <div class="mobile-overlay-inner">
+        <div class="mobile-overlay-head">
+          <button id="mobile-hamburger-close" class="mobile-hamburger-close" aria-label="Close menu">✕</button>
+        </div>
+        <div class="mobile-overlay-actions">
+          <button id="overlay-summarizer" class="button button-ghost" type="button">Summarizer</button>
+          <button id="overlay-flashcard" class="button button-ghost" type="button">Flashcards</button>
+          <button id="overlay-logout" class="button button-ghost" type="button">Logout</button>
+        </div>
+        <div class="mobile-overlay-chats">
+          <div class="section-head"><h2>Chats</h2></div>
+          <div id="overlay-chat-list" class="chat-list"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Markdown renderer + sanitizer for assistant responses -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
@@ -285,6 +320,11 @@ import '../styles/global.css';
 
         const frameRails = document.getElementById('frame-rails');
         const leftResize = document.getElementById('left-resize');
+        const mobileCaretBtn = document.getElementById('mobile-caret');
+        const mobileProfileMenu = document.getElementById('mobile-profile-menu');
+        const mobileSummBtn = document.getElementById('mobile-summarizer');
+        const mobileFlashBtn = document.getElementById('mobile-flashcard');
+        const mobileLogoutBtn = document.getElementById('mobile-logout');
 
         if (identityPill) {
           identityPill.textContent = user.name;
@@ -326,14 +366,40 @@ import '../styles/global.css';
             if (!resp.ok) {
               let detail = '';
               try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+              // If unauthorized, fall back to a demo chat list so UI can be tested locally
+              if (resp.status === 401 || String(detail).toLowerCase().includes('invalid access token')) {
+                setStatus('Not authenticated — using demo chats', 'warning');
+                setConnection('Connected (demo)', 'warning');
+                const demo = [{ id: 0, local_id: 0, name: 'Demo chat', created_at: new Date().toISOString() }];
+                renderChats(demo);
+                return;
+              }
               throw new Error(`${resp.status}: ${detail}`);
             }
             const chats = await resp.json();
             renderChats(chats);
+
+            // Keep dashboard usable on mobile by opening a chat thread by default.
+            const hasSelectedChat = chats.some((chat) => chat.local_id === selectedChatId);
+            if (!hasSelectedChat) {
+              selectedChatId = null;
+              if (chats.length > 0) {
+                const firstChat = chats[0];
+                await selectChat(firstChat.id, firstChat.local_id, firstChat.name, firstChat.created_at || '');
+              } else {
+                if (chatTitle) chatTitle.textContent = 'Select a chat';
+                if (composer) composer.hidden = true;
+                if (summaryChatPill) summaryChatPill.textContent = 'No chat selected';
+                if (flashcardChatPill) flashcardChatPill.textContent = 'No chat selected';
+                try { updateTopbarButtons(); } catch (e) {}
+              }
+            }
+
             setConnection('Connected', 'success');
           } catch (err) {
             console.error('Load chats error:', err);
-            setConnection('Offline', 'danger');
+            // If we already populated demo chats above, don't overwrite connection state
+            if (!document.getElementById('chat-list')?.children.length) setConnection('Offline', 'danger');
           }
         }
 
@@ -352,7 +418,7 @@ import '../styles/global.css';
           });
 
           // Render each chat as an item with a selectable area and an actions menu
-          chatList.innerHTML = chats.map(chat => {
+          const html = chats.map(chat => {
             const active = chat.local_id === selectedChatId ? ' chat-item-active' : '';
             const created = chat.created_at ? formatDate(chat.created_at) : '';
             return `<div class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}" data-created-at="${chat.created_at || ''}">
@@ -364,110 +430,123 @@ import '../styles/global.css';
             </div>`;
           }).join('');
 
-          // selection handler
-          chatList.querySelectorAll('.chat-select').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-              const wrapper = ev.currentTarget.closest('.chat-item');
-              if (!wrapper) return;
-              const chatId = Number(wrapper.dataset.chatId);
-              const localId = Number(wrapper.dataset.localId);
-              const createdAt = wrapper.dataset.createdAt || '';
-              const chatName = wrapper.querySelector('span')?.textContent || 'Chat';
-              selectChat(chatId, localId, chatName, createdAt);
+          chatList.innerHTML = html;
+          const overlayList = document.getElementById('overlay-chat-list');
+          if (overlayList) overlayList.innerHTML = html;
+
+          // attach handlers to both lists (main rail + mobile overlay)
+          const lists = [chatList, overlayList].filter(Boolean);
+          lists.forEach((list) => {
+            list.querySelectorAll('.chat-select').forEach(btn => {
+              btn.addEventListener('click', (ev) => {
+                const wrapper = ev.currentTarget.closest('.chat-item');
+                if (!wrapper) return;
+                const chatId = Number(wrapper.dataset.chatId);
+                const localId = Number(wrapper.dataset.localId);
+                const createdAt = wrapper.dataset.createdAt || '';
+                const chatName = wrapper.querySelector('span')?.textContent || 'Chat';
+                selectChat(chatId, localId, chatName, createdAt);
+                // if opened from overlay, close it and show chat
+                if (list === overlayList) {
+                  const mo = document.getElementById('mobile-overlay');
+                  const mh = document.getElementById('mobile-hamburger');
+                  if (mo) { mo.hidden = true; mo.classList.remove('open'); }
+                  if (mh) mh.setAttribute('aria-expanded', 'false');
+                  if (messageStream) messageStream.style.display = '';
+                }
+              });
             });
-          });
 
-          // actions menu: open a small popup with Rename / Delete
-          chatList.querySelectorAll('.chat-menu').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              closeAllChatMenus();
-              const wrapper = ev.currentTarget.closest('.chat-item');
-              if (!wrapper) return;
-              const localId = Number(wrapper.dataset.localId);
-              const chatName = wrapper.querySelector('span')?.textContent || 'this chat';
-
-              // build menu
-              const menu = document.createElement('div');
-              menu.className = 'chat-actions-menu';
-
-              const renameBtn = document.createElement('button');
-              renameBtn.type = 'button';
-              renameBtn.textContent = 'Rename';
-              renameBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
+            list.querySelectorAll('.chat-menu').forEach(btn => {
+              btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
                 closeAllChatMenus();
-                const newName = await openModal({ title: 'Rename chat', message: 'Enter a new name for this chat:', showInput: true, inputValue: chatName, confirmText: 'Save', confirmClass: 'button button-primary' });
-                if (!newName) return;
-                try {
-                  const url = `${API_BASE}/chats/${localId}?user_id=${user.id}`;
-                  const resp = await fetch(url, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                    body: JSON.stringify({ name: newName }),
-                  });
-                  if (!resp.ok) {
-                    let detail = '';
-                    try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
-                    throw new Error(`${resp.status}: ${detail}`);
+                const wrapper = ev.currentTarget.closest('.chat-item');
+                if (!wrapper) return;
+                const localId = Number(wrapper.dataset.localId);
+                const chatName = wrapper.querySelector('span')?.textContent || 'this chat';
+
+                // build menu
+                const menu = document.createElement('div');
+                menu.className = 'chat-actions-menu';
+
+                const renameBtn = document.createElement('button');
+                renameBtn.type = 'button';
+                renameBtn.textContent = 'Rename';
+                renameBtn.addEventListener('click', async (e) => {
+                  e.stopPropagation();
+                  closeAllChatMenus();
+                  const newName = await openModal({ title: 'Rename chat', message: 'Enter a new name for this chat:', showInput: true, inputValue: chatName, confirmText: 'Save', confirmClass: 'button button-primary' });
+                  if (!newName) return;
+                  try {
+                    const url = `${API_BASE}/chats/${localId}?user_id=${user.id}`;
+                    const resp = await fetch(url, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                      body: JSON.stringify({ name: newName }),
+                    });
+                    if (!resp.ok) {
+                      let detail = '';
+                      try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+                      throw new Error(`${resp.status}: ${detail}`);
+                    }
+                    setStatus('Chat renamed', 'success');
+                    await loadChats();
+                  } catch (err) {
+                    console.error('Rename chat error:', err);
+                    setStatus('Unable to rename chat: ' + (err?.message || err), 'danger');
                   }
-                  setStatus('Chat renamed', 'success');
-                  await loadChats();
-                } catch (err) {
-                  console.error('Rename chat error:', err);
-                  setStatus('Unable to rename chat: ' + (err?.message || err), 'danger');
-                }
+                });
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.style.color = 'var(--danger)';
+                deleteBtn.addEventListener('click', async (e) => {
+                  e.stopPropagation();
+                  closeAllChatMenus();
+                  const ok = await openModal({ title: 'Delete chat', message: `Delete '${chatName}' permanently? This cannot be undone.`, showInput: false, confirmText: 'Delete', confirmClass: 'btn-danger' });
+                  if (!ok) return;
+                  try {
+                    setStatus('Deleting chat...', 'warning');
+                    const url = `${API_BASE}/chats/${localId}?user_id=${user.id}`;
+                    const resp = await fetch(url, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token()}` },
+                    });
+                    if (!resp.ok) {
+                      let detail = '';
+                      try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
+                      throw new Error(`${resp.status}: ${detail}`);
+                    }
+
+                    if (selectedChatId === localId) {
+                      selectedChatId = null;
+                      if (composer) composer.hidden = true;
+                      if (messageStream) messageStream.innerHTML = `<div class="empty-state"><h3>Select a chat</h3><p>Choose a chat from the left sidebar or create a new one to start asking questions about your notes.</p></div>`;
+                      if (chatTitle) chatTitle.textContent = 'Select a chat';
+                      if (summaryChatPill) summaryChatPill.textContent = 'No chat selected';
+                      if (flashcardChatPill) flashcardChatPill.textContent = 'No chat selected';
+                      try { updateTopbarButtons(); } catch (e) {}
+                    }
+
+                    await loadChats();
+                    setStatus('Chat deleted', 'success');
+                  } catch (err) {
+                    console.error('Delete chat error:', err);
+                    setStatus('Unable to delete chat: ' + (err?.message || err), 'danger');
+                  }
+                });
+
+                menu.appendChild(renameBtn);
+                menu.appendChild(deleteBtn);
+
+                wrapper.appendChild(menu);
+                // close on outside click
+                setTimeout(() => {
+                  window.addEventListener('click', closeAllChatMenus, { once: true });
+                }, 0);
               });
-
-              const deleteBtn = document.createElement('button');
-              deleteBtn.type = 'button';
-              deleteBtn.textContent = 'Delete';
-              deleteBtn.style.color = 'var(--danger)';
-              deleteBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                closeAllChatMenus();
-                const ok = await openModal({ title: 'Delete chat', message: `Delete '${chatName}' permanently? This cannot be undone.`, showInput: false, confirmText: 'Delete', confirmClass: 'btn-danger' });
-                if (!ok) return;
-                try {
-                  setStatus('Deleting chat...', 'warning');
-                  const url = `${API_BASE}/chats/${localId}?user_id=${user.id}`;
-                  const resp = await fetch(url, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${token()}` },
-                  });
-                  if (!resp.ok) {
-                    let detail = '';
-                    try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
-                    throw new Error(`${resp.status}: ${detail}`);
-                  }
-
-                  // If the deleted chat was selected, clear selection and UI
-                  if (selectedChatId === localId) {
-                    selectedChatId = null;
-                    if (composer) composer.hidden = true;
-                    if (messageStream) messageStream.innerHTML = `<div class="empty-state"><h3>Select a chat</h3><p>Choose a chat from the left sidebar or create a new one to start asking questions about your notes.</p></div>`;
-                    if (chatTitle) chatTitle.textContent = 'Select a chat';
-                    if (summaryChatPill) summaryChatPill.textContent = 'No chat selected';
-                    if (flashcardChatPill) flashcardChatPill.textContent = 'No chat selected';
-                    try { updateTopbarButtons(); } catch (e) {}
-                  }
-
-                  await loadChats();
-                  setStatus('Chat deleted', 'success');
-                } catch (err) {
-                  console.error('Delete chat error:', err);
-                  setStatus('Unable to delete chat: ' + (err?.message || err), 'danger');
-                }
-              });
-
-              menu.appendChild(renameBtn);
-              menu.appendChild(deleteBtn);
-
-              wrapper.appendChild(menu);
-              // close on outside click
-              setTimeout(() => {
-                window.addEventListener('click', closeAllChatMenus, { once: true });
-              }, 0);
             });
           });
 
@@ -510,6 +589,105 @@ import '../styles/global.css';
           } catch (e) {
             /* ignore */
           }
+        }
+
+        // Mobile toggles: hamburger opens left chat rail, caret toggles profile pill visual state
+        const isMobile = () => window.matchMedia && window.matchMedia('(max-width:720px)').matches;
+
+        // close profile menu when clicking outside
+        document.addEventListener('click', (ev) => {
+          if (!isMobile()) return;
+          const target = ev.target;
+          if (mobileProfileMenu && !mobileProfileMenu.hidden && !document.getElementById('profile-pill')?.contains(target)) {
+            mobileProfileMenu.hidden = true;
+            document.getElementById('profile-pill')?.classList.remove('open');
+            mobileCaretBtn?.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        if (mobileCaretBtn) {
+          mobileCaretBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!isMobile()) return;
+            const pill = document.getElementById('profile-pill');
+            if (!pill) return;
+            const open = pill.classList.toggle('open');
+            mobileCaretBtn.setAttribute('aria-expanded', String(open));
+            if (mobileProfileMenu) mobileProfileMenu.hidden = !open;
+          });
+        }
+
+        // Mobile top-left hamburger -> full screen overlay
+        const mobileHamburger = document.getElementById('mobile-hamburger');
+        const mobileOverlay = document.getElementById('mobile-overlay');
+        const mobileHamburgerClose = document.getElementById('mobile-hamburger-close');
+        const overlaySummBtn = document.getElementById('overlay-summarizer');
+        const overlayFlashBtn = document.getElementById('overlay-flashcard');
+        const overlayLogoutBtn = document.getElementById('overlay-logout');
+
+        function closeMobileOverlay() {
+          if (!mobileOverlay) return;
+          mobileOverlay.hidden = true;
+          mobileOverlay.classList.remove('open');
+          if (mobileHamburger) mobileHamburger.setAttribute('aria-expanded', 'false');
+          if (messageStream) messageStream.style.display = '';
+        }
+
+        if (mobileHamburger && mobileOverlay) {
+          // Ensure mobile starts on dashboard/workspace by default.
+          closeMobileOverlay();
+
+          mobileHamburger.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (!isMobile()) return;
+            const open = !mobileOverlay.classList.contains('open');
+            mobileOverlay.classList.toggle('open', open);
+            mobileOverlay.hidden = !open;
+            mobileHamburger.setAttribute('aria-expanded', String(open));
+          });
+
+          mobileHamburgerClose?.addEventListener('click', (e) => { e.stopPropagation(); closeMobileOverlay(); });
+
+          // close overlay when clicking outside
+          document.addEventListener('click', (ev) => {
+            if (!isMobile()) return;
+            if (!mobileOverlay || mobileOverlay.hidden) return;
+            const target = ev.target;
+            if (!mobileOverlay.contains(target) && !mobileHamburger.contains(target)) closeMobileOverlay();
+          });
+
+          document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeMobileOverlay(); });
+        }
+
+        // Wire overlay action buttons to existing handlers
+        overlaySummBtn?.addEventListener('click', () => { summarizerBtn?.click(); closeMobileOverlay(); });
+        overlayFlashBtn?.addEventListener('click', () => { flashcardBtn?.click(); closeMobileOverlay(); });
+        overlayLogoutBtn?.addEventListener('click', () => { logoutBtn?.click(); });
+
+        // Wire mobile menu buttons to existing actions (reuse existing buttons)
+        if (mobileSummBtn) {
+          mobileSummBtn.addEventListener('click', () => {
+            const btn = document.getElementById('summarizer-btn');
+            if (btn) btn.click();
+            if (mobileProfileMenu) mobileProfileMenu.hidden = true;
+            document.getElementById('profile-pill')?.classList.remove('open');
+            mobileCaretBtn?.setAttribute('aria-expanded', 'false');
+          });
+        }
+        if (mobileFlashBtn) {
+          mobileFlashBtn.addEventListener('click', () => {
+            const btn = document.getElementById('flashcard-btn');
+            if (btn) btn.click();
+            if (mobileProfileMenu) mobileProfileMenu.hidden = true;
+            document.getElementById('profile-pill')?.classList.remove('open');
+            mobileCaretBtn?.setAttribute('aria-expanded', 'false');
+          });
+        }
+        if (mobileLogoutBtn) {
+          mobileLogoutBtn.addEventListener('click', () => {
+            const btn = document.getElementById('logout-btn');
+            if (btn) btn.click();
+          });
         }
 
         async function loadMessages(chatId) {

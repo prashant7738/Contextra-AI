@@ -13,6 +13,12 @@ _client: Any = None
 _collection: Collection | None = None
 
 
+def _strip_nul_chars(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("\x00", "")
+
+
 def get_collection() -> Collection:
     global _client, _collection
     if _collection is None:
@@ -36,14 +42,14 @@ def store_embeddings(chunks: list[dict], embeddings: list[list[float]], user_id:
     ids = [str(uuid.uuid4()) for _ in chunks]
     
     # Extract text from chunks
-    documents = [chunk["text"] for chunk in chunks]
+    documents = [_strip_nul_chars(chunk.get("text")) for chunk in chunks]
     
     # Create metadata for each chunk
     metadatas = []
     for chunk in chunks:
         metadata = {
             "page": chunk.get("page", 0),
-            "filename": chunk.get("filename", "unknown")
+            "filename": _strip_nul_chars(chunk.get("filename", "unknown")) or "unknown"
         }
         if user_id is not None:
             metadata["user_id"] = user_id

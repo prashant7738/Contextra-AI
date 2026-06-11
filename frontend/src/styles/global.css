@@ -98,6 +98,14 @@ button {
   gap: 10px;
 }
 
+/* Show summarizer/flashcard in topbar by default (desktop/tablet) */
+#summarizer-btn,
+#flashcard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .profile-pill {
   display: inline-flex;
   align-items: center;
@@ -120,6 +128,13 @@ button {
   letter-spacing: 0.08em;
   background: var(--accent);
   color: #f8f5ef;
+}
+
+/* hide mobile-only controls by default; shown only inside mobile media query */
+.mobile-caret,
+.mobile-chat-toggle,
+.mobile-profile-menu {
+  display: none;
 }
 
 .ambient {
@@ -781,6 +796,90 @@ textarea {
 
 .empty-state h3 {
   font-size: clamp(1.6rem, 2vw, 2.4rem);
+}
+
+/* Mobile-only hamburger + full-screen overlay */
+@media (max-width: 720px) {
+  .mobile-caret,
+  .mobile-chat-toggle,
+  .mobile-profile-menu,
+  #summarizer-btn,
+  #flashcard-btn,
+  #logout-btn {
+    display: none !important;
+  }
+
+  .mobile-hamburger {
+    display: inline-grid;
+    grid-auto-flow: row;
+    gap: 6px;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-items: center;
+    background: rgba(255,255,255,0.7);
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    padding: 8px;
+    margin-right: 6px;
+  }
+
+  .mobile-hamburger .mh-bar {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .mobile-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1600;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,247,242,0.96));
+    display: grid;
+    place-items: start;
+    padding: 24px;
+    overflow: auto;
+  }
+
+  .mobile-overlay[hidden] {
+    display: none !important;
+  }
+
+  .mobile-overlay-inner {
+    width: 100%;
+    max-width: 720px;
+    margin: 8px 0 24px 0;
+    display: grid;
+    gap: 18px;
+  }
+
+  .mobile-overlay-head {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .mobile-hamburger-close {
+    background: transparent;
+    border: 0;
+    font-size: 22px;
+    padding: 8px;
+  }
+
+  .mobile-overlay-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .mobile-overlay-chats {
+    margin-top: 8px;
+  }
+
+  #overlay-chat-list .chat-item {
+    padding: 12px 14px;
+  }
 }
 
 .empty-state p {
@@ -1453,5 +1552,22 @@ textarea {
 
   .bubble {
     max-width: 100%;
+  }
+
+  /* hide summarizer/flashcard in mobile; visible on larger screens */
+  #summarizer-btn,
+  #flashcard-btn { display: none; }
+
+  /* Keep dashboard workspace as default mobile view; use overlay for chats/nav. */
+  .left-rail {
+    display: none !important;
+  }
+
+  .resize-handle {
+    display: none !important;
+  }
+
+  .frame-rails {
+    grid-template-columns: 1fr !important;
   }
 }

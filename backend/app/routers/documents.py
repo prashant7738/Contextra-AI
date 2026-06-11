@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
+def _strip_nul_chars(text: str) -> str:
+    """Remove NUL bytes that can break DB inserts and downstream storage."""
+    if not text:
+        return ""
+    return text.replace("\x00", "")
+
+
 @router.get("/", response_model=List[DocumentResponse])
 def list_documents_for_chat(user_id: int, chat_id: int, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
     """
@@ -95,6 +102,7 @@ async def file_input(
             for page_num, page in enumerate(doc, start=1):
                 # Use hybrid extraction: fitz first, OCR as fallback
                 text, method = extract_text_hybrid(page, page_num=page_num)
+                text = _strip_nul_chars(text)
                 extraction_stats[method] += 1
 
                 full_text += text
