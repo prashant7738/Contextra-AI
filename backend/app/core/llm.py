@@ -1,3 +1,4 @@
+import asyncio
 from huggingface_hub import InferenceClient
 
 from app.settings import settings
@@ -18,10 +19,8 @@ def get_llm() -> InferenceClient:
     return _chat_client
 
 
-
-
-
-def ask_llm(context: str, question: str, max_tokens: int = 500) -> str:
+def _ask_llm_sync(context: str, question: str, max_tokens: int = 500) -> str:
+    """Synchronous LLM call - runs in thread pool."""
     client = get_llm()
     prompt = f"""
 You are a helpful assistant. Use the following context to answer the question.
@@ -40,10 +39,16 @@ Question: {question}
     return response.choices[0].message.content
 
 
+async def ask_llm(context: str, question: str, max_tokens: int = 500) -> str:
+    """Async wrapper for LLM call - runs in thread pool to avoid blocking."""
+    return await asyncio.to_thread(_ask_llm_sync, context, question, max_tokens)
 
 
 
-def ask_detailed_summary_llm(context: str, topic_name: str, max_tokens: int = 700) -> str:
+
+
+def _ask_detailed_summary_llm_sync(context: str, topic_name: str, max_tokens: int = 700) -> str:
+    """Synchronous detailed summary - runs in thread pool."""
     client = get_llm()
     prompt = f"""
 You are an expert study assistant.
@@ -89,10 +94,13 @@ Context:
     return response.choices[0].message.content
 
 
-def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
-    """
-    Generate flashcards from context using a strict marker format.
-    """
+async def ask_detailed_summary_llm(context: str, topic_name: str, max_tokens: int = 700) -> str:
+    """Async wrapper for detailed summary - runs in thread pool to avoid blocking."""
+    return await asyncio.to_thread(_ask_detailed_summary_llm_sync, context, topic_name, max_tokens)
+
+
+def _generate_flashcards_llm_sync(context: str, max_tokens: int = 1000) -> str:
+    """Synchronous flashcard generation - runs in thread pool."""
     client = get_llm()
     prompt = f"""Generate learning flashcards from the content below.
 
@@ -121,3 +129,8 @@ Content:
         temperature=0.2,
     )
     return response.choices[0].message.content
+
+
+async def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
+    """Async wrapper for flashcard generation - runs in thread pool to avoid blocking."""
+    return await asyncio.to_thread(_generate_flashcards_llm_sync, context, max_tokens)

@@ -133,7 +133,7 @@ def patch_user_chat(chat_id: int, user_id: int, data: ChatCreate, db: Session = 
 
 
 @router.post("/query", response_model=QueryResponse)
-def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
+async def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
     """
     Query within a specific chat context.
     
@@ -154,7 +154,7 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db),
         chat_history = message_repository.get_chat_history(db, chat.id, user_id, limit=10)
         
         # Answer query with chat history context
-        answer, references = answer_query(query.request, user_id, chat.id, chat_history=chat_history)
+        answer, references = await answer_query(query.request, user_id, chat.id, chat_history=chat_history)
         
         # Save the message and response to history
         saved_message = message_repository.save_message(db, chat.id, user_id, query.request, answer)
@@ -173,7 +173,7 @@ def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(get_db),
 
 
 @router.post("/detailed-summarizer", response_model=DetailedSummaryResponse)
-def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
+async def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
     """
     Generate an detailed study summary using 80/20 rule from uploaded notes in a chat.
     
@@ -200,7 +200,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
         
         # Only call answer_query for specific topics, not for "all"
         if normalized_topic and normalized_topic != "all":
-            initial_answer, _ = answer_query(
+            initial_answer, _ = await answer_query(
                 question=payload.topic_name,
                 user_id=user_id,
                 chat_id=chat.id,
@@ -208,7 +208,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
             )
         
         # Generate detailed summary with optional pre-generated answer as context
-        summary, title, sections, references, chunks_used = generate_detailed_summary(
+        summary, title, sections, references, chunks_used = await generate_detailed_summary(
             topic_name=payload.topic_name or "all",
             user_id=user_id,
             chat_id=chat.id,
@@ -231,7 +231,7 @@ def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db: Sessi
 
 
 @router.post("/flashcard", response_model=FlashcardResponse)
-def generate_flashcard(user_id: int, chat_id: int, payload: Optional[FlashcardRequest] = None, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
+async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[FlashcardRequest] = None, db: Session = Depends(get_db), current_user: UserResponse = Depends(get_current_user)):
     """
     Generate flashcards from all uploaded notes in a chat.
     
@@ -264,7 +264,7 @@ def generate_flashcard(user_id: int, chat_id: int, payload: Optional[FlashcardRe
         n_results = payload.n_results if payload else 5
         max_tokens = payload.max_tokens if payload else 1000
         
-        flashcards, references = generate_flashcards(
+        flashcards, references = await generate_flashcards(
             user_id=user_id,
             chat_id=chat.id,
             n_results=n_results,

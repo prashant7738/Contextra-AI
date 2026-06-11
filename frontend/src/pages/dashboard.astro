@@ -798,7 +798,7 @@ import '../styles/global.css';
                 </div>
                 <div class="bubble bubble-bot">
                   <p class="bubble-label">Assistant</p>
-                  <p>Thinking...</p>
+                  <div class="bot-content"><p>Thinking...</p></div>
                 </div>
               </div>
             `);
@@ -806,14 +806,19 @@ import '../styles/global.css';
           }
 
           try {
-            const resp = await fetch(`${API_BASE}/chats/query?user_id=${user.id}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token()}`,
-              },
-              body: JSON.stringify({ chat_id: selectedChatId, request }),
-            });
+            const resp = await Promise.race([
+              fetch(`${API_BASE}/chats/query?user_id=${user.id}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({ chat_id: selectedChatId, request }),
+              }),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timeout after 120 seconds')), 120000)
+              ),
+            ]);
             if (!resp.ok) {
               let detail = '';
               try { const j = await resp.json(); detail = j.detail || JSON.stringify(j); } catch(_) { detail = resp.statusText; }
@@ -823,16 +828,24 @@ import '../styles/global.css';
             const pendingTurn = document.getElementById('pending-turn');
             if (pendingTurn) {
               const botBubble = pendingTurn.querySelector('.bubble-bot .bot-content');
-              if (botBubble) botBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.answer || ''));
+              if (botBubble) {
+                botBubble.innerHTML = DOMPurify.sanitize(marked.parse(data.answer || ''));
+              } else {
+                console.warn('bot-content div not found, falling back to direct update');
+              }
               pendingTurn.id = '';
             }
+            // Clear input and reset UI
+            if (queryInput) queryInput.value = '';
             setStatus('', 'success');
           } catch (err) {
             console.error('Query error:', err);
             const pendingTurn = document.getElementById('pending-turn');
             if (pendingTurn) {
-              const botBubble = pendingTurn.querySelector('.bubble-bot p:last-child');
-              if (botBubble) botBubble.textContent = `Error: ${err.message}`;
+              const botBubble = pendingTurn.querySelector('.bubble-bot .bot-content');
+              if (botBubble) {
+                botBubble.innerHTML = `<p style="color: #c33;">Error: ${escapeHtml(err.message)}</p>`;
+              }
               pendingTurn.id = '';
             }
             setStatus('Query failed', 'danger');

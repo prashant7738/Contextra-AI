@@ -1,3 +1,4 @@
+import asyncio
 from app.core.embedder import embed_texts
 from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm
 from app.repositories.vector_repository import query_similar
@@ -9,7 +10,7 @@ import json
 import re
 
 
-def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> tuple[str, list[dict]]:
+async def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> tuple[str, list[dict]]:
     """
     Answer a query within a specific chat context.
     
@@ -38,10 +39,10 @@ def answer_query(question: str, user_id: int, chat_id: int, chat_history: list =
     
     # Combine contexts: history + document context
     full_context = context + history_context
-    return ask_llm(full_context, question), references
+    return await ask_llm(full_context, question), references
 
 
-def generate_detailed_summary(
+async def generate_detailed_summary(
     topic_name: str,
     user_id: int,
     chat_id: int,
@@ -95,7 +96,7 @@ def generate_detailed_summary(
     else:
         full_context = context
     
-    summary_output = ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
+    summary_output = await ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
     summary, title, sections = _parse_detailed_summary_output(summary_output, normalized_topic)
     return summary, title, sections, references, len(docs)
 
@@ -187,7 +188,7 @@ def _format_detailed_summary_text(title: str, sections: list[dict]) -> str:
     return "\n".join(lines).strip()
 
 
-def generate_flashcards(
+async def generate_flashcards(
     user_id: int,
     chat_id: int,
     n_results: int = 5,
@@ -223,7 +224,7 @@ def generate_flashcards(
     references = _extract_references(results)
     
     # Step 2: Generate flashcards using LLM
-    flashcards_output = generate_flashcards_llm(context, max_tokens=max_tokens)
+    flashcards_output = await generate_flashcards_llm(context, max_tokens=max_tokens)
     
     # Step 3: Parse response in marker format first, then JSON as fallback
     cleaned_flashcards = parse_flashcard_marker_output(flashcards_output)
