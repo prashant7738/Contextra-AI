@@ -3,6 +3,11 @@ import '../styles/global.css';
 import themeInit from '../scripts/theme-init.js?raw';
 import ThemeToggle from '../components/ThemeToggle.astro';
 
+import fraunces600 from '@fontsource/fraunces/files/fraunces-latin-600-normal.woff2?url';
+import fraunces700 from '@fontsource/fraunces/files/fraunces-latin-700-normal.woff2?url';
+import ibmPlex400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2?url';
+import ibmPlex500 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2?url';
+
 export interface Props {
   title: string;
   description?: string;
@@ -45,6 +50,10 @@ const {
       </script>
     )}
     <script is:inline set:html={themeInit} />
+    <link rel="preload" href={fraunces600} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={fraunces700} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={ibmPlex400} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={ibmPlex500} as="font" type="font/woff2" crossorigin />
   </head>
   <body class={bodyClass} id={bodyId}>
     <a href="#main" class="skip-link">Skip to main content</a>

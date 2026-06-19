@@ -9,7 +9,8 @@
     "check": "astro check",
     "typecheck": "astro check",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:analyze": "ANALYZE=true astro build"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",
@@ -31,6 +32,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "jsdom": "^25.0.1",
+    "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   }
