@@ -965,7 +965,7 @@ import '../styles/global.css';
               </div>
               <p class="summary-body">${escapeHtml(data.summary || 'No summary content')}</p>
               ${sections || ''}
-              ${references ? `<div class="summary-sources"><h4>References</h4><ul>${references}</ul></div>` : ''}
+              ${references ? `<details class="summary-sources"><summary class="summary-sources-toggle">References</summary><ul>${references}</ul></details>` : ''}
             </article>
           `;
         }
@@ -1053,7 +1053,7 @@ import '../styles/global.css';
                     <div class="flashcard-details">
                       <div class="flashcard-details-inner">
                         <p class="flashcard-explanation">${escapeHtml(card.explanation || 'No explanation')}</p>
-                        ${refs ? `<div class="flashcard-sources"><h4>References</h4><ul>${refs}</ul></div>` : ''}
+                        ${refs ? `<details class="flashcard-sources"><summary class="flashcard-sources-toggle">References</summary><ul>${refs}</ul></details>` : ''}
                       </div>
                     </div>
                   </article>
