@@ -946,17 +946,107 @@ textarea {
 
 .summary-card {
   display: grid;
-  gap: 14px;
-  border: 1px solid rgba(31, 61, 54, 0.16);
+  gap: 0;
+  border: 1px solid rgba(31, 61, 54, 0.14);
   border-radius: var(--radius-md);
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
 }
 
 .summary-card-head {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(31, 61, 54, 0.08);
+  background: rgba(245, 249, 246, 0.7);
+}
+
+.summary-card-meta {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+}
+
+.summary-card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0b2620;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.summary-card-body {
+  padding: 16px 18px;
+  display: grid;
+  gap: 14px;
+}
+
+/* Markdown body (fallback when no sections) */
+.summary-md-body {
+  color: #2a251f;
+  line-height: 1.78;
+  font-size: 0.95rem;
+}
+
+.summary-md-body p { margin: 0 0 10px; }
+.summary-md-body p:last-child { margin-bottom: 0; }
+.summary-md-body h1,.summary-md-body h2,.summary-md-body h3 {
+  color: #0b2620;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(31, 61, 54, 0.1);
+}
+.summary-md-body ul,.summary-md-body ol {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+.summary-md-body li { margin-bottom: 5px; line-height: 1.65; }
+.summary-md-body strong { color: #0b2620; font-weight: 700; }
+.summary-md-body em { color: #4a5568; font-style: italic; }
+.summary-md-body code {
+  background: rgba(11, 38, 32, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+.summary-md-body blockquote {
+  border-left: 3px solid rgba(31, 61, 54, 0.25);
+  margin: 0 0 10px;
+  padding: 6px 14px;
+  color: #556;
+}
+
+/* Structured sections */
+.summary-section {
+  display: grid;
   gap: 8px;
+}
+
+.summary-section-heading {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #1a5c44;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(26, 92, 68, 0.15);
+}
+
+.summary-section-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+}
+
+.summary-section-list li {
+  color: #2a251f;
+  line-height: 1.65;
+  font-size: 0.94rem;
 }
 
 .summary-body {
