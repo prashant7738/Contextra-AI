@@ -24,21 +24,42 @@ import '../styles/global.css';
           <p class="eyebrow">Contextra AI</p>
           <h1>Study cockpit</h1>
         </div>
+
+        <nav class="topbar-nav" id="topbar-nav" aria-label="Main navigation">
+          <button id="nav-chat-btn" class="nav-tab nav-tab-active" type="button">Chat</button>
+          <button id="summarizer-btn" class="nav-tab" type="button" style="display:none">Summarizer</button>
+          <button id="flashcard-btn" class="nav-tab" type="button" style="display:none">Flashcards</button>
+        </nav>
+
         <div class="topbar-actions">
           <div id="profile-pill" class="profile-pill" aria-live="polite">
             <span id="profile-avatar" class="profile-avatar">U</span>
             <span id="profile-name">User</span>
+            <!-- Three-line menu toggle (desktop) -->
+            <button id="profile-menu-toggle" class="profile-menu-toggle" type="button" aria-expanded="false" aria-label="Open profile menu">
+              <span class="pmenu-bar"></span>
+              <span class="pmenu-bar"></span>
+              <span class="pmenu-bar"></span>
+            </button>
+            <!-- Profile dropdown -->
+            <div id="profile-dropdown" class="profile-dropdown" hidden>
+              <a href="/profile" class="profile-dropdown-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0 1 18 0"/></svg>
+                Profile
+              </a>
+              <button id="logout-btn" class="profile-dropdown-item profile-dropdown-danger" type="button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Logout
+              </button>
+            </div>
+            <!-- Mobile caret (shown on mobile only) -->
             <button id="mobile-caret" class="mobile-caret" type="button" aria-expanded="false">▾</button>
-
             <div id="mobile-profile-menu" class="mobile-profile-menu" hidden>
               <button id="mobile-summarizer" class="button button-ghost" type="button">Summarizer</button>
               <button id="mobile-flashcard" class="button button-ghost" type="button">Flashcards</button>
               <button id="mobile-logout" class="button button-ghost" type="button">Logout</button>
             </div>
           </div>
-          <button id="summarizer-btn" class="button button-ghost" type="button">Summarizer</button>
-          <button id="flashcard-btn" class="button button-ghost" type="button">Flashcards</button>
-          <button id="logout-btn" class="button button-ghost" type="button">Logout</button>
         </div>
       </header>
 
@@ -288,7 +309,11 @@ import '../styles/global.css';
         const logoutBtn = document.getElementById('logout-btn');
         const summarizerBtn = document.getElementById('summarizer-btn');
         const flashcardBtn = document.getElementById('flashcard-btn');
+        const navChatBtn = document.getElementById('nav-chat-btn');
+        const profileMenuToggle = document.getElementById('profile-menu-toggle');
+        const profileDropdown = document.getElementById('profile-dropdown');
         const topbar = document.getElementById('topbar');
+        let currentView = 'chat';
         const summaryChatPill = document.getElementById('summary-chat-pill');
         const flashcardChatPill = document.getElementById('flashcard-chat-pill');
         const messageStream = document.getElementById('message-stream');
@@ -1273,11 +1298,18 @@ import '../styles/global.css';
 
         refreshBtn?.addEventListener('click', loadChats);
 
-        // show summarizer/flashcard buttons only when a chat is selected
+        // show summarizer/flashcard tabs only when a chat is selected
         function updateTopbarButtons() {
           const hasChat = Boolean(selectedChatId);
           if (summarizerBtn) summarizerBtn.style.display = hasChat ? '' : 'none';
           if (flashcardBtn) flashcardBtn.style.display = hasChat ? '' : 'none';
+          updateNavActive();
+        }
+
+        function updateNavActive() {
+          if (navChatBtn) navChatBtn.classList.toggle('nav-tab-active', currentView === 'chat');
+          if (summarizerBtn) summarizerBtn.classList.toggle('nav-tab-active', currentView === 'summarizer');
+          if (flashcardBtn) flashcardBtn.classList.toggle('nav-tab-active', currentView === 'flashcard');
         }
 
         // open/close panels replacing chat view
@@ -1291,6 +1323,8 @@ import '../styles/global.css';
           messageStream.style.display = 'none';
           summaryPanel.hidden = false;
           flashcardPanel.hidden = true;
+          currentView = 'summarizer';
+          updateNavActive();
         }
 
         function showFlashcardPanel() {
@@ -1298,18 +1332,41 @@ import '../styles/global.css';
           messageStream.style.display = 'none';
           flashcardPanel.hidden = false;
           summaryPanel.hidden = true;
+          currentView = 'flashcard';
+          updateNavActive();
         }
 
         function closePanels() {
           if (summaryPanel) summaryPanel.hidden = true;
           if (flashcardPanel) flashcardPanel.hidden = true;
           messageStream.style.display = '';
+          currentView = 'chat';
+          updateNavActive();
         }
 
         summarizerBtn?.addEventListener('click', () => { showSummaryPanel(); });
         flashcardBtn?.addEventListener('click', () => { showFlashcardPanel(); });
         summaryClose?.addEventListener('click', () => { closePanels(); });
         flashcardClose?.addEventListener('click', () => { closePanels(); });
+        navChatBtn?.addEventListener('click', () => { closePanels(); });
+
+        // Profile dropdown (desktop three-line menu)
+        profileMenuToggle?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!profileDropdown) return;
+          const isOpen = !profileDropdown.hidden;
+          profileDropdown.hidden = isOpen;
+          profileMenuToggle.setAttribute('aria-expanded', String(!isOpen));
+        });
+
+        document.addEventListener('click', (ev) => {
+          if (!profileDropdown || profileDropdown.hidden) return;
+          const pill = document.getElementById('profile-pill');
+          if (!pill?.contains(ev.target)) {
+            profileDropdown.hidden = true;
+            profileMenuToggle?.setAttribute('aria-expanded', 'false');
+          }
+        });
 
         setupResizableRails();
         loadChats();

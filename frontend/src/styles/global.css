@@ -98,7 +98,139 @@ button {
   gap: 10px;
 }
 
-/* Show summarizer/flashcard in topbar by default (desktop/tablet) */
+/* ── Topbar nav tabs ──────────────────────────────────── */
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(40, 32, 24, 0.06);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.nav-tab {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 7px 18px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  background: rgba(31, 61, 54, 0.08);
+  color: var(--text);
+}
+
+.nav-tab-active {
+  background: var(--panel-strong);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(31, 61, 54, 0.1);
+}
+
+/* ── Profile pill (desktop three-line menu) ───────────── */
+.profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px 6px 6px;
+  background: rgba(255, 255, 255, 0.86);
+  position: relative;
+}
+
+.profile-menu-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.profile-menu-toggle:hover {
+  background: rgba(31, 61, 54, 0.08);
+}
+
+.pmenu-bar {
+  display: block;
+  width: 17px;
+  height: 2px;
+  background: var(--muted);
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+
+.profile-menu-toggle:hover .pmenu-bar,
+.profile-menu-toggle[aria-expanded="true"] .pmenu-bar {
+  background: var(--accent);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1300;
+  min-width: 164px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 32px rgba(46, 37, 28, 0.18);
+  overflow: hidden;
+  animation: dropdown-in 0.16s ease;
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.profile-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.profile-dropdown-item:hover {
+  background: rgba(31, 61, 54, 0.06);
+}
+
+.profile-dropdown-danger {
+  color: var(--danger);
+}
+
+.profile-dropdown-danger:hover {
+  background: rgba(140, 47, 47, 0.06);
+}
+
+/* Show summarizer/flashcard tabs (they are now nav-tabs, not button-ghost) */
 #summarizer-btn,
 #flashcard-btn {
   display: inline-flex;
@@ -106,15 +238,6 @@ button {
   gap: 8px;
 }
 
-.profile-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 12px 6px 6px;
-  background: rgba(255, 255, 255, 0.86);
-}
 
 .profile-avatar {
   display: inline-flex;
