@@ -219,7 +219,6 @@ import '../styles/global.css';
               </div>
             </div>
             <div class="composer-bar">
-              <button id="toggle-upload" class="button button-ghost" type="button" title="Attach PDF">Upload</button>
               <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
               <button id="send-btn" class="button button-primary" type="button">Send</button>
             </div>
@@ -1232,11 +1231,7 @@ import '../styles/global.css';
           }
         });
 
-        toggleUpload?.addEventListener('click', () => {
-          if (!composerUpload) return;
-          composerUpload.hidden = !composerUpload.hidden;
-          toggleUpload.textContent = composerUpload.hidden ? 'Upload' : 'Close Upload';
-        });
+        // toggle-upload button removed; upload section is shown via setComposerMode()
 
         dropzoneLabel?.addEventListener('dragover', (ev) => {
           ev.preventDefault();
@@ -1325,6 +1320,7 @@ import '../styles/global.css';
           flashcardPanel.hidden = true;
           currentView = 'summarizer';
           updateNavActive();
+          setComposerMode('upload');
         }
 
         function showFlashcardPanel() {
@@ -1334,6 +1330,7 @@ import '../styles/global.css';
           summaryPanel.hidden = true;
           currentView = 'flashcard';
           updateNavActive();
+          setComposerMode('upload');
         }
 
         function closePanels() {
@@ -1342,6 +1339,19 @@ import '../styles/global.css';
           messageStream.style.display = '';
           currentView = 'chat';
           updateNavActive();
+          setComposerMode('chat');
+        }
+
+        function setComposerMode(mode) {
+          const bar = document.querySelector('.composer-bar');
+          if (!composerUpload || !bar) return;
+          if (mode === 'upload') {
+            composerUpload.hidden = false;
+            bar.style.display = 'none';
+          } else {
+            composerUpload.hidden = true;
+            bar.style.display = '';
+          }
         }
 
         summarizerBtn?.addEventListener('click', () => { showSummaryPanel(); });
