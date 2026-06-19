@@ -3,25 +3,155 @@
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
 
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — unified light/dark system.
+   New code uses --color-*, --space-*, --text-*, --shadow-*,
+   --duration-*, --ease-*, --bp-*. Legacy aliases (--bg, --text,
+   --accent, --line, --muted, --shadow, --radius-*) are kept so
+   the existing dashboard stylesheet works unchanged.
+   ───────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --bg: #f4efe7;
-  --bg-soft: #fcfaf7;
-  --panel: rgba(255, 252, 247, 0.84);
-  --panel-strong: #fffdf9;
-  --text: #171513;
-  --muted: #6a6257;
-  --line: rgba(40, 32, 24, 0.12);
-  --accent: #1f3d36;
-  --accent-soft: rgba(31, 61, 54, 0.1);
-  --success: #23634c;
-  --warning: #8c5e12;
-  --danger: #8c2f2f;
-  --shadow: 0 24px 70px rgba(46, 37, 28, 0.12);
-  --radius-xl: 30px;
-  --radius-lg: 22px;
-  --radius-md: 16px;
-  --radius-sm: 12px;
+
+  /* Color — semantic light palette */
+  --color-bg:               #f4efe7;
+  --color-bg-soft:          #fcfaf7;
+  --color-surface:          rgba(255, 252, 247, 0.84);
+  --color-surface-strong:   #fffdf9;
+  --color-surface-overlay:  rgba(255, 255, 255, 0.92);
+  --color-text:             #171513;
+  --color-text-muted:       #6a6257;
+  --color-text-inverted:    #f8f5ef;
+  --color-border:           rgba(40, 32, 24, 0.12);
+  --color-border-strong:    rgba(40, 32, 24, 0.24);
+  --color-accent:           #1f3d36;
+  --color-accent-hover:     #163029;
+  --color-accent-soft:      rgba(31, 61, 54, 0.10);
+  --color-accent-fg:        #f8f5ef;
+  --color-focus-ring:       rgba(31, 61, 54, 0.35);
+  --color-success:          #23634c;
+  --color-success-bg:       rgba(35, 99, 76, 0.10);
+  --color-warning:          #8c5e12;
+  --color-warning-bg:       rgba(140, 94, 18, 0.10);
+  --color-danger:           #8c2f2f;
+  --color-danger-bg:        rgba(140, 47, 47, 0.10);
+
+  /* Typography */
+  --font-sans:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-mono:    ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+
+  --text-xs:      clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
+  --text-sm:      clamp(0.82rem, 0.80rem + 0.10vw, 0.88rem);
+  --text-base:    clamp(0.94rem, 0.90rem + 0.20vw, 1.02rem);
+  --text-lg:      clamp(1.05rem, 1.00rem + 0.30vw, 1.20rem);
+  --text-xl:      clamp(1.20rem, 1.10rem + 0.50vw, 1.45rem);
+  --text-2xl:     clamp(1.45rem, 1.25rem + 0.85vw, 1.85rem);
+  --text-3xl:     clamp(1.80rem, 1.50rem + 1.30vw, 2.40rem);
+  --text-display: clamp(2.20rem, 1.70rem + 2.20vw, 3.20rem);
+
+  --leading-tight:  1.15;
+  --leading-snug:   1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.75;
+
+  /* Spacing scale (4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 56 / 80) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  56px;
+  --space-10: 80px;
+
+  /* Radii */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-xl:   26px;
+  --radius-2xl:  32px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(15, 17, 21, 0.04), 0 1px 1px rgba(15, 17, 21, 0.03);
+  --shadow-2: 0 4px 12px rgba(15, 17, 21, 0.06), 0 2px 4px rgba(15, 17, 21, 0.04);
+  --shadow-3: 0 12px 28px rgba(15, 17, 21, 0.10), 0 4px 8px rgba(15, 17, 21, 0.05);
+  --shadow-4: 0 24px 56px rgba(15, 17, 21, 0.14), 0 8px 16px rgba(15, 17, 21, 0.06);
+
+  /* Motion */
+  --duration-1: 120ms;
+  --duration-2: 180ms;
+  --duration-3: 260ms;
+  --duration-4: 400ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0.9, 0.3, 1);
+
+  /* Breakpoints (informational; for use in JS or container query refs) */
+  --bp-sm:  640px;
+  --bp-md:  768px;
+  --bp-lg:  1024px;
+  --bp-xl:  1280px;
+
+  /* ── Legacy aliases consumed by existing CSS ─────────── */
+  --bg:           var(--color-bg);
+  --bg-soft:      var(--color-bg-soft);
+  --panel:        var(--color-surface);
+  --panel-strong: var(--color-surface-strong);
+  --text:         var(--color-text);
+  --muted:        var(--color-text-muted);
+  --line:         var(--color-border);
+  --accent:       var(--color-accent);
+  --accent-soft:  var(--color-accent-soft);
+  --success:      var(--color-success);
+  --warning:      var(--color-warning);
+  --danger:       var(--color-danger);
+  --shadow:       var(--shadow-4);
+}
+
+/* ── Dark theme overrides ──────────────────────────────────── */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg:               #0f1115;
+  --color-bg-soft:          #161922;
+  --color-surface:          rgba(28, 32, 41, 0.84);
+  --color-surface-strong:   #1c2029;
+  --color-surface-overlay:  rgba(20, 23, 30, 0.92);
+  --color-text:             #ecebe6;
+  --color-text-muted:       #a0a09a;
+  --color-text-inverted:    #0f1115;
+  --color-border:           rgba(255, 252, 247, 0.10);
+  --color-border-strong:    rgba(255, 252, 247, 0.18);
+  --color-accent:           #7db8a3;
+  --color-accent-hover:     #95c9b5;
+  --color-accent-soft:      rgba(125, 184, 163, 0.14);
+  --color-accent-fg:        #0f1115;
+  --color-focus-ring:       rgba(125, 184, 163, 0.55);
+  --color-success:          #6ad19f;
+  --color-success-bg:       rgba(106, 209, 159, 0.12);
+  --color-warning:          #f0c47a;
+  --color-warning-bg:       rgba(240, 196, 122, 0.12);
+  --color-danger:           #f59595;
+  --color-danger-bg:        rgba(245, 149, 149, 0.12);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40), 0 1px 1px rgba(0, 0, 0, 0.30);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.30);
+  --shadow-3: 0 12px 28px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
+  --shadow-4: 0 24px 56px rgba(0, 0, 0, 0.60), 0 8px 16px rgba(0, 0, 0, 0.40);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 *,
@@ -37,27 +167,58 @@ body {
 }
 
 body {
-  font-family: "IBM Plex Sans", sans-serif;
-  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
   background:
     radial-gradient(circle at top left, rgba(31, 61, 54, 0.14), transparent 35%),
     radial-gradient(circle at right center, rgba(195, 161, 120, 0.18), transparent 28%),
     linear-gradient(180deg, #faf7f2 0%, #f2ebe1 100%);
 }
 
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at top left, rgba(125, 184, 163, 0.10), transparent 40%),
+    radial-gradient(circle at right center, rgba(216, 169, 109, 0.08), transparent 32%),
+    linear-gradient(180deg, #0f1115 0%, #161922 100%);
+}
+
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+  color: inherit;
 }
 
 button {
   cursor: pointer;
 }
 
-::selection {
-  background: rgba(31, 61, 54, 0.18);
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+/* a11y: visually hide an element but keep it available to assistive tech. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 
 .app-shell {
   position: relative;

@@ -1,43 +1,26 @@
 ---
-// This page redirects based on auth status
-// The actual redirect happens on the client side
-import '../styles/global.css';
-
-const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Contextra AI" />
-    <title>Contextra AI</title>
-  </head>
-  <body>
-    <main>
-      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
-        <p>Loading...</p>
-      </div>
-    </main>
-
-    <script>
-      // Check if user is authenticated by looking at localStorage
-      function isAuthenticated() {
-        try {
-          const token = localStorage.getItem('access_token');
-          return !!token;
-        } catch {
-          return false;
-        }
+<BaseLayout title="Contextra AI" description="Contextra AI — context-aware AI workspace.">
+  <main id="main" class="splash">
+    <p>Loading…</p>
+  </main>
+  <style>
+    .splash {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+  </style>
+  <script is:inline>
+    (function () {
+      try {
+        var token = localStorage.getItem('access_token');
+        window.location.replace(token ? '/dashboard' : '/login');
+      } catch (_) {
+        window.location.replace('/login');
       }
-      
-      // Redirect based on auth status
-      if (isAuthenticated()) {
-        window.location.href = '/dashboard';
-      } else {
-        window.location.href = '/login';
-      }
-    </script>
-  </body>
-</html>
-              <div id="summary-output" class="summary-output">
+    })();
+  </script>
+</BaseLayout>

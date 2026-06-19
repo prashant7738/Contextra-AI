@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { apiClient } from '../utils/api';
-import { AuthService } from '../utils/auth';
+import { AuthService, type AuthTokens, type User } from '../utils/auth';
 import './AuthPages.css';
 
 export default function LoginPage() {
@@ -8,57 +8,61 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const errorId = useId();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
       const response = await apiClient.login(email, password);
-
       if (response.error) {
         setError(response.error);
         return;
       }
-
       if (response.data) {
-        // Store tokens
-        AuthService.setTokens(response.data);
-
-        // Fetch and store user info
+        AuthService.setTokens(response.data as AuthTokens);
         const userResponse = await apiClient.getMe();
         if (userResponse.data) {
-          AuthService.setCurrentUser(userResponse.data);
+          AuthService.setCurrentUser(userResponse.data as User);
         }
-
-        // Redirect to dashboard
         window.location.href = '/dashboard';
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
+  const isInvalid = Boolean(error);
+
   return (
     <div className="auth-container">
-      <div className="auth-card">
-        <h1>Login</h1>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
+      <main className="auth-card" aria-labelledby="login-title">
+        <h1 id="login-title">Login</h1>
+        <form onSubmit={handleSubmit} noValidate>
+          {error && (
+            <div className="error-message" role="alert" id={errorId}>
+              {error}
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
               id="email"
+              name="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
               disabled={loading}
+              aria-invalid={isInvalid || undefined}
+              aria-describedby={isInvalid ? errorId : undefined}
             />
           </div>
 
@@ -66,28 +70,28 @@ export default function LoginPage() {
             <label htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               disabled={loading}
+              aria-invalid={isInvalid || undefined}
+              aria-describedby={isInvalid ? errorId : undefined}
             />
           </div>
 
-          <button
-            type="submit"
-            className="submit-button"
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
+          <button type="submit" className="submit-button" disabled={loading} aria-busy={loading}>
+            {loading ? 'Logging in…' : 'Login'}
           </button>
         </form>
 
         <p className="auth-link">
           Don't have an account? <a href="/register">Register here</a>
         </p>
-      </div>
+      </main>
     </div>
   );
 }

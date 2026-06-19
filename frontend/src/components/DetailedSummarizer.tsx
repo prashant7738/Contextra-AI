@@ -1,62 +1,86 @@
-import React, { useState, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useId, useRef, useState, type ChangeEvent } from 'react';
 import styles from './DetailedSummarizer.module.css';
-import { apiClient } from '/src/utils/api';
+import { apiClient } from '../utils/api';
+import { renderMarkdown } from '../utils/markdown';
+
+interface SummarySection {
+  heading?: string;
+  items?: string[];
+}
+
+interface SummaryResult {
+  topic?: string;
+  title?: string;
+  timestamp?: string;
+  summary?: string;
+  content?: string;
+  sections?: SummarySection[];
+  chunks_used?: number;
+  tokens_used?: number;
+}
+
+interface FormState {
+  topic: string;
+  resultsCount: string;
+  userId: string;
+  chatId: string;
+}
 
 export default function DetailedSummarizer() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     topic: '',
     resultsCount: '5',
     userId: '1',
     chatId: '',
   });
 
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<SummaryResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [expandedCards, setExpandedCards] = useState(new Set());
-  const resultsRef = useRef(null);
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [errorMessage, setErrorMessage] = useState('');
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+  const errorId = useId();
 
-  // use centralized apiClient which includes auth headers
-
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: value
-    }));
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
   const summarizeChats = async () => {
     const userId = parseInt(formData.userId);
     if (!userId) {
-      alert('Please enter a valid User ID');
+      setErrorMessage('Please enter a valid User ID.');
       return;
     }
 
+    setErrorMessage('');
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
-        user_id: userId,
-        n_results: parseInt(formData.resultsCount),
-        max_tokens: 2000
+        user_id: String(userId),
+        n_results: String(parseInt(formData.resultsCount)),
+        max_tokens: '2000',
       });
 
-      const payload = {
+      const payload: { topic_name: string; chat_id?: number } = {
         topic_name: formData.topic || 'General',
       };
-
       if (formData.chatId) {
         payload.chat_id = parseInt(formData.chatId);
       }
 
-      const res = await apiClient.post(`/chats/detailed-summarizer?${params}`, payload);
+      const res = await apiClient.post<SummaryResult>(
+        `/chats/detailed-summarizer?${params.toString()}`,
+        payload,
+        { timeoutMs: 120_000 },
+      );
 
       if (res.error) {
         throw new Error(res.error);
       }
 
-      setResults([res.data]);
+      setResults(res.data ? [res.data] : []);
       setShowResults(true);
       setExpandedCards(new Set());
 
@@ -64,8 +88,8 @@ export default function DetailedSummarizer() {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error fetching summaries: ' + error.message);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setErrorMessage(`Error fetching summaries: ${message}`);
       setShowResults(false);
     } finally {
       setIsLoading(false);
@@ -75,35 +99,35 @@ export default function DetailedSummarizer() {
   const clearResults = () => {
     setShowResults(false);
     setResults([]);
-    setFormData(prev => ({
-      ...prev,
-      topic: '',
-      chatId: ''
-    }));
+    setErrorMessage('');
+    setFormData((prev) => ({ ...prev, topic: '', chatId: '' }));
     setExpandedCards(new Set());
   };
 
-  const toggleExpand = (index) => {
-    const newExpanded = new Set(expandedCards);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedCards(newExpanded);
+  const toggleExpand = (index: number) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   };
 
   return (
-    <div className={styles.container}>
-      {/* Header */}
+    <main className={styles.container} aria-labelledby="summarizer-title">
       <div className={styles.header}>
-        <h1 className={styles.title}>Detailed Summarizer</h1>
+        <h1 id="summarizer-title" className={styles.title}>Detailed Summarizer</h1>
         <p className={styles.subtitle}>
           Extract and refine summaries from your chat history by topic. Discover patterns, key insights, and knowledge at a glance.
         </p>
       </div>
 
-      {/* Controls */}
+      {errorMessage && (
+        <div id={errorId} role="alert" className={styles.emptyState} style={{ borderColor: 'var(--color-danger)' }}>
+          <p className={styles.emptyStateText}>{errorMessage}</p>
+        </div>
+      )}
+
       <div className={styles.controls}>
         <div className={styles.controlGroup}>
           <label htmlFor="topic" className={styles.label}>Topic</label>
@@ -114,6 +138,7 @@ export default function DetailedSummarizer() {
             value={formData.topic}
             onChange={handleInputChange}
             className={styles.input}
+            aria-describedby={errorMessage ? errorId : undefined}
           />
         </div>
         <div className={styles.controlGroup}>
@@ -142,6 +167,9 @@ export default function DetailedSummarizer() {
             value={formData.userId}
             onChange={handleInputChange}
             className={styles.input}
+            min={1}
+            aria-invalid={errorMessage ? true : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
           />
         </div>
         <div className={styles.controlGroup}>
@@ -153,27 +181,30 @@ export default function DetailedSummarizer() {
             value={formData.chatId}
             onChange={handleInputChange}
             className={styles.input}
+            min={1}
           />
         </div>
       </div>
 
-      {/* Button Group */}
       <div className={styles.buttonGroup}>
         <button
+          type="button"
           className={`${styles.btn} ${styles.btnPrimary}`}
           onClick={summarizeChats}
           disabled={isLoading}
+          aria-busy={isLoading}
         >
           {isLoading ? (
             <>
-              <span className={styles.loadingSpinner}></span>
-              <span>Processing...</span>
+              <span className={styles.loadingSpinner} aria-hidden="true"></span>
+              <span>Processing…</span>
             </>
           ) : (
             'Generate Summary'
           )}
         </button>
         <button
+          type="button"
           className={`${styles.btn} ${styles.btnSecondary}`}
           onClick={clearResults}
           disabled={isLoading}
@@ -182,11 +213,15 @@ export default function DetailedSummarizer() {
         </button>
       </div>
 
-      {/* Results Container */}
       {showResults && (
-        <div className={styles.resultsContainer} ref={resultsRef}>
+        <section
+          className={styles.resultsContainer}
+          ref={resultsRef}
+          aria-live="polite"
+          aria-labelledby="summary-results-title"
+        >
           <div className={styles.resultsHeader}>
-            <h2 className={styles.resultsTitle}>Summary Results</h2>
+            <h2 id="summary-results-title" className={styles.resultsTitle}>Summary Results</h2>
             <div className={styles.resultCount}>
               {results.length} {results.length === 1 ? 'result' : 'results'}
             </div>
@@ -194,14 +229,14 @@ export default function DetailedSummarizer() {
 
           {results.length === 0 ? (
             <div className={styles.emptyState}>
-              <div className={styles.emptyStateIcon}>📚</div>
+              <div className={styles.emptyStateIcon} aria-hidden="true">📚</div>
               <h3 className={styles.emptyStateTitle}>No results found</h3>
               <p className={styles.emptyStateText}>Try adjusting your search criteria.</p>
             </div>
           ) : (
             <div className={styles.resultsGrid}>
               {results.map((result, idx) => (
-                <div
+                <article
                   key={idx}
                   className={`${styles.resultCard} ${expandedCards.has(idx) ? styles.expanded : ''}`}
                   style={{ animationDelay: `${0.4 + idx * 0.1}s` }}
@@ -210,9 +245,7 @@ export default function DetailedSummarizer() {
                     <span className={styles.cardTopic}>{result.topic || 'General'}</span>
                     <h3 className={styles.cardTitle}>{result.title || 'Untitled Summary'}</h3>
                     <div className={styles.cardMeta}>
-                      {result.timestamp
-                        ? new Date(result.timestamp).toLocaleDateString()
-                        : 'Date unknown'}
+                      {result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'Date unknown'}
                     </div>
                   </div>
 
@@ -222,45 +255,49 @@ export default function DetailedSummarizer() {
                         <div key={sectionIdx} className={styles.summarySection}>
                           <h4 className={styles.sectionTitle}>{section.heading}</h4>
                           <ul className={styles.sectionList}>
-                            {section.items?.map((item, itemIdx) => (
-                              <li key={itemIdx}>{item}</li>
-                            ))}
+                            {section.items?.map((item, itemIdx) => <li key={itemIdx}>{item}</li>)}
                           </ul>
                         </div>
                       ))
                     ) : (
-                      <ReactMarkdown>{result.summary || result.content || 'No content available'}</ReactMarkdown>
+                      <div
+                        // Markdown sanitized by DOMPurify in renderMarkdown.
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(result.summary || result.content || 'No content available'),
+                        }}
+                      />
                     )}
                   </div>
 
                   <div className={styles.cardFooter}>
                     <span className={styles.tokenUsage}>
-                      {result.chunks_used || result.tokens_used || '—'} chunks
+                      {result.chunks_used ?? result.tokens_used ?? '—'} chunks
                     </span>
                     <button
+                      type="button"
                       className={styles.expandBtn}
                       onClick={() => toggleExpand(idx)}
+                      aria-expanded={expandedCards.has(idx)}
                     >
                       {expandedCards.has(idx) ? 'Collapse' : 'Expand'}
                     </button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* Empty State */}
       {!showResults && (
         <div className={styles.emptyState}>
-          <div className={styles.emptyStateIcon}>📚</div>
+          <div className={styles.emptyStateIcon} aria-hidden="true">📚</div>
           <h3 className={styles.emptyStateTitle}>No results yet</h3>
           <p className={styles.emptyStateText}>
             Configure your search criteria and click "Generate Summary" to extract insights from your chats.
           </p>
         </div>
       )}
-    </div>
+    </main>
   );
 }

@@ -1,16 +1,12 @@
 ---
-import LoginPage from '../components/LoginPage.jsx';
-import '../styles/global.css';
+import LoginPage from '../components/LoginPage.tsx';
+import { ErrorBoundary } from '../components/ErrorBoundary.tsx';
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Login to Contextra AI" />
-    <title>Login - Contextra AI</title>
-  </head>
-  <body>
-    <LoginPage client:load />
-  </body>
-</html>
+<BaseLayout title="Login – Contextra AI" description="Login to Contextra AI">
+  <main id="main">
+    <ErrorBoundary client:load>
+      <LoginPage client:load />
+    </ErrorBoundary>
+  </main>
+</BaseLayout>

@@ -1,8 +1,8 @@
 ---
-import Layout from '../components/AuthWrapper.jsx';
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-<Layout>
-  <main class="admin-root">
+<BaseLayout title="Admin – Contextra AI" requireAuth>
+  <main class="admin-root" id="main">
     <h1 class="title">Admin Panel</h1>
     <p class="subtitle">User list and chat inspection (admin only)</p>
 
@@ -24,32 +24,39 @@ import Layout from '../components/AuthWrapper.jsx';
     a.chats-link{display:inline-block;margin-top:10px;color:#0b66ff;text-decoration:none}
   </style>
 
-  <script type="module">
+  <script>
     import { apiClient } from '../utils/api';
-    const usersEl = document.getElementById('users');
-    const loadingEl = document.getElementById('loading');
 
-    async function loadUsers(){
-      loadingEl.style.display='block';
-      const res = await apiClient.get('/admin/users');
-      loadingEl.style.display='none';
-      if(res.error){
+    interface AdminUser { id: number; name: string; email: string }
+
+    const usersEl = document.getElementById('users') as HTMLUListElement | null;
+    const loadingEl = document.getElementById('loading') as HTMLElement | null;
+
+    async function loadUsers() {
+      if (!usersEl || !loadingEl) return;
+      loadingEl.style.display = 'block';
+      const res = await apiClient.get<AdminUser[]>('/admin/users');
+      loadingEl.style.display = 'none';
+      if (res.error) {
         usersEl.innerHTML = `<li class="user-card">Error: ${res.error}</li>`;
         return;
       }
-      const users = res.data || [];
-      if(!users.length){
+      const users = res.data ?? [];
+      if (!users.length) {
         usersEl.innerHTML = '<li class="user-card">No users found</li>';
         return;
       }
-      usersEl.innerHTML = users.map(u => `
+      usersEl.innerHTML = users
+        .map(
+          (u) => `
         <li class="user-card">
           <h3>${u.name}</h3>
           <p>${u.email}</p>
-          <a class="chats-link" href="/admin/user/${u.id}/chats">View chats</a>
-        </li>
-      `).join('');
+          <a class="chats-link" href="/admin/user-chats?id=${u.id}">View chats</a>
+        </li>`
+        )
+        .join('');
     }
     loadUsers();
   </script>
-</Layout>
+</BaseLayout>

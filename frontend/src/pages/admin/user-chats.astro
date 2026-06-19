@@ -1,0 +1,60 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="User chats – Admin" requireAuth>
+  <main id="main" style="max-width:900px;margin:48px auto;padding:24px;">
+    <p><a href="/admin">← Back to admin</a></p>
+    <h2 id="heading">Chats</h2>
+    <div id="loading">Loading chats…</div>
+    <ul id="chats" style="list-style:none;padding:0;margin:0;display:grid;grid-gap:10px"></ul>
+  </main>
+
+  <script>
+    import { apiClient } from '../../utils/api';
+
+    interface AdminChat { id: number; name: string }
+
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('id');
+    const chatsEl = document.getElementById('chats') as HTMLUListElement | null;
+    const loadingEl = document.getElementById('loading') as HTMLElement | null;
+    const headingEl = document.getElementById('heading') as HTMLHeadingElement | null;
+
+    if (!userId) {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (chatsEl) {
+        chatsEl.innerHTML =
+          '<li style="padding:12px;background:#fee;color:#600">Missing user id in URL (?id=…)</li>';
+      }
+    } else {
+      if (headingEl) headingEl.textContent = `Chats for user #${userId}`;
+      void load();
+    }
+
+    async function load() {
+      if (!chatsEl || !loadingEl) return;
+      loadingEl.style.display = 'block';
+      const res = await apiClient.get<AdminChat[]>(`/admin/users/${userId}/chats`);
+      loadingEl.style.display = 'none';
+      if (res.error) {
+        chatsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${res.error}</li>`;
+        return;
+      }
+      const chats = res.data ?? [];
+      if (!chats.length) {
+        chatsEl.innerHTML =
+          '<li style="padding:12px;background:#f4f6f9;border-radius:8px">No chats</li>';
+        return;
+      }
+      chatsEl.innerHTML = chats
+        .map(
+          (c) => `
+        <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
+          <div style="font-weight:600">${c.name}</div>
+          <a href="/admin/chat-messages?id=${c.id}">View messages</a>
+        </li>`
+        )
+        .join('');
+    }
+  </script>
+</BaseLayout>

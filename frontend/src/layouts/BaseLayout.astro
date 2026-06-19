@@ -1,0 +1,89 @@
+---
+import '../styles/global.css';
+import themeInit from '../scripts/theme-init.js?raw';
+import ThemeToggle from '../components/ThemeToggle.astro';
+
+export interface Props {
+  title: string;
+  description?: string;
+  /**
+   * When true, a pre-paint inline script redirects to /login if no
+   * access_token is present in localStorage. Use for protected pages.
+   */
+  requireAuth?: boolean;
+  /** Extra class names applied to <body>. */
+  bodyClass?: string;
+  /** Optional path to an additional CSS file imported by the page. */
+  bodyId?: string;
+}
+
+const {
+  title,
+  description = 'Contextra AI — your context-aware AI workspace.',
+  requireAuth = false,
+  bodyClass,
+  bodyId,
+} = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    <title>{title}</title>
+    {requireAuth && (
+      <script is:inline>
+        try {
+          if (!localStorage.getItem('access_token')) {
+            window.location.replace('/login');
+          }
+        } catch (_) {
+          window.location.replace('/login');
+        }
+      </script>
+    )}
+    <script is:inline set:html={themeInit} />
+  </head>
+  <body class={bodyClass} id={bodyId}>
+    <a href="#main" class="skip-link">Skip to main content</a>
+    <div class="layout-theme-toggle" aria-hidden="false">
+      <ThemeToggle />
+    </div>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  .skip-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 9999;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #0b1220;
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+    transition: transform 0.18s ease;
+  }
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    transform: translateY(0);
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  .layout-theme-toggle {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1100;
+  }
+  @media print {
+    .layout-theme-toggle,
+    .skip-link { display: none; }
+  }
+</style>

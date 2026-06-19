@@ -1,0 +1,96 @@
+---
+/**
+ * ThemeToggle — cycles light → dark → auto. Persists to localStorage('theme').
+ * Pre-paint resolution is handled by src/scripts/theme-init.js (loaded by BaseLayout).
+ *
+ * Props:
+ *   class? — extra class names for the button (host page can override placement)
+ */
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+<button
+  type="button"
+  class={`theme-toggle${className ? ' ' + className : ''}`}
+  data-theme-toggle
+  aria-label="Toggle color theme"
+  title="Toggle color theme"
+>
+  <span class="theme-toggle__icon" aria-hidden="true">
+    <svg class="theme-toggle__sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    <svg class="theme-toggle__moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="theme-toggle__auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+  </span>
+  <span class="theme-toggle__label">Theme</span>
+</button>
+
+<style is:global>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+    padding: 8px 12px;
+    border-radius: var(--radius-full, 999px);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--duration-2) var(--ease-standard),
+                border-color var(--duration-2) var(--ease-standard),
+                color var(--duration-2) var(--ease-standard);
+  }
+  .theme-toggle:hover {
+    background: var(--color-accent-soft);
+    border-color: var(--color-border-strong);
+    color: var(--color-accent);
+  }
+  .theme-toggle:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+  .theme-toggle__icon {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+  }
+  .theme-toggle__icon > svg { display: none; }
+  :root[data-theme-pref="light"] .theme-toggle__sun  { display: block; }
+  :root[data-theme-pref="dark"]  .theme-toggle__moon { display: block; }
+  :root[data-theme-pref="auto"]  .theme-toggle__auto { display: block; }
+  @media (max-width: 640px) {
+    .theme-toggle__label { display: none; }
+  }
+</style>
+
+<script>
+  const NEXT = { light: 'dark', dark: 'auto', auto: 'light' } as const;
+  type Theme = keyof typeof NEXT;
+
+  function applyTheme(pref: Theme) {
+    const resolved: 'light' | 'dark' =
+      pref === 'auto'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        : pref;
+    document.documentElement.setAttribute('data-theme', resolved);
+    document.documentElement.setAttribute('data-theme-pref', pref);
+  }
+
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
+  mql.addEventListener('change', () => {
+    if ((localStorage.getItem('theme') ?? 'auto') === 'auto') applyTheme('auto');
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const current = (document.documentElement.getAttribute('data-theme-pref') as Theme) ?? 'auto';
+      const next = NEXT[current];
+      localStorage.setItem('theme', next);
+      applyTheme(next);
+    });
+  });
+</script>
