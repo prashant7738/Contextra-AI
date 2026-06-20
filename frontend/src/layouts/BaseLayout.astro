@@ -1,7 +1,6 @@
 ---
 import '../styles/global.css';
 import themeInit from '../scripts/theme-init.js?raw';
-import ThemeToggle from '../components/ThemeToggle.astro';
 
 import fraunces600 from '@fontsource/fraunces/files/fraunces-latin-600-normal.woff2?url';
 import fraunces700 from '@fontsource/fraunces/files/fraunces-latin-700-normal.woff2?url';
@@ -57,9 +56,6 @@ const {
   </head>
   <body class={bodyClass} id={bodyId}>
     <a href="#main" class="skip-link">Skip to main content</a>
-    <div class="layout-theme-toggle" aria-hidden="false">
-      <ThemeToggle />
-    </div>
     <slot />
   </body>
 </html>
@@ -85,14 +81,7 @@ const {
     outline: 2px solid currentColor;
     outline-offset: 2px;
   }
-  .layout-theme-toggle {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 1100;
-  }
   @media print {
-    .layout-theme-toggle,
     .skip-link { display: none; }
   }
 </style>

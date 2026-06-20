@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
 ---
 <BaseLayout title="Dashboard – Contextra AI" description="Contextra AI Dashboard" requireAuth>
     <main class="app-shell" id="main">
@@ -24,6 +25,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         </nav>
 
         <div class="topbar-actions">
+          <ThemeToggle class="theme-toggle-navbar" />
           <div id="profile-pill" class="profile-pill" aria-live="polite">
             <span id="profile-avatar" class="profile-avatar">U</span>
             <span id="profile-name">User</span>

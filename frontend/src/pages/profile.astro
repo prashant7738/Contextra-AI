@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
 ---
 <BaseLayout title="Profile – Contextra AI" requireAuth>
   <main class="app-shell" id="main">
@@ -16,7 +17,34 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <h1>Profile</h1>
         </div>
         <div class="topbar-actions">
-          <a href="/dashboard" class="button button-ghost">← Dashboard</a>
+          <ThemeToggle class="theme-toggle-navbar" />
+          <div id="profile-pill" class="profile-pill" aria-live="polite">
+            <span id="profile-avatar" class="profile-avatar">U</span>
+            <span id="profile-name">User</span>
+            <!-- Three-line menu toggle (desktop) -->
+            <button id="profile-menu-toggle" class="profile-menu-toggle" type="button" aria-expanded="false" aria-label="Open profile menu">
+              <span class="pmenu-bar" aria-hidden="true"></span>
+              <span class="pmenu-bar" aria-hidden="true"></span>
+              <span class="pmenu-bar" aria-hidden="true"></span>
+            </button>
+            <!-- Profile dropdown -->
+            <div id="profile-dropdown" class="profile-dropdown" hidden>
+              <a href="/profile" class="profile-dropdown-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0 1 18 0"/></svg>
+                Profile
+              </a>
+              <ThemeToggle class="theme-toggle-dropdown" />
+              <button id="logout-btn" class="profile-dropdown-item profile-dropdown-danger" type="button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Logout
+              </button>
+            </div>
+            <!-- Mobile caret (shown on mobile only) -->
+            <button id="mobile-caret" class="mobile-caret" type="button" aria-expanded="false" aria-label="Open profile menu"><span aria-hidden="true">▾</span></button>
+            <div id="mobile-profile-menu" class="mobile-profile-menu" hidden>
+              <button id="mobile-logout" class="button button-ghost" type="button">Logout</button>
+            </div>
+          </div>
         </div>
       </header>
 
