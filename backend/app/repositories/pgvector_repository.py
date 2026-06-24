@@ -53,7 +53,11 @@ def query_similar(
 ) -> dict[str, Any]:
     db = get_db()
     try:
-        stmt = select(Embedding).order_by(Embedding.embedding.cosine_distance(Vector(query_embedding))).limit(n_results)
+        # Use the <=> operator directly with a literal vector
+        from sqlalchemy import text
+        query_vector_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+        
+        stmt = select(Embedding).order_by(text(f"embedding <=> '{query_vector_str}'::vector")).limit(n_results)
         
         conditions = []
         if user_id is not None:
@@ -65,6 +69,16 @@ def query_similar(
             stmt = stmt.where(and_(*conditions))
         
         results = db.execute(stmt).scalars().all()
+        
+        # Compute cosine distance in Python
+        import numpy as np
+        query_vec = np.array(query_embedding)
+        distances = []
+        for r in results:
+            emb_vec = np.array(r.embedding)
+            # Cosine distance = 1 - cosine similarity
+            cos_sim = np.dot(query_vec, emb_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(emb_vec))
+            distances.append(float(1 - cos_sim))
         
         return {
             "ids": [[str(r.id) for r in results]],
@@ -78,7 +92,7 @@ def query_similar(
                 }
                 for r in results
             ]],
-            "distances": [[float(r.embedding.cosine_distance(Vector(query_embedding))) for r in results]] if results else [[]],
+            "distances": [distances] if results else [[]],
         }
     finally:
         db.close()
