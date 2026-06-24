@@ -1,6 +1,6 @@
 from app.core.chunker import chunk_document
 from app.core.embedder import embed_texts
-from app.repositories.vector_repository import store_embeddings
+from app.repositories.pgvector_repository import store_embeddings
 
 
 def ingest_text(pages_data: list[dict], chunk_size: int = 300, user_id: int = None, document_id: int = None, chat_id: int = None) -> int:
