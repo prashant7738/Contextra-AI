@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm ci && npm run build",
+  "outputDirectory": "dist",
+  "framework": "astro",
+  "nodeVersion": "20.x"
+}
