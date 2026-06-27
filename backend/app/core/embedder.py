@@ -1,4 +1,9 @@
-_model: "SentenceTransformer" | None = None
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
+
+_model: Optional["SentenceTransformer"] = None
 _MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
