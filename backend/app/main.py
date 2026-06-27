@@ -35,14 +35,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Second Brain AI Workspace", lifespan=lifespan)
 
 cors_origins = [
-    origin.strip()
+    origin.strip().rstrip("/")
     for origin in os.getenv("CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
 
+# Must have explicit origins when allow_credentials=True (no wildcard "*")
+if not cors_origins:
+    cors_origins = ["http://localhost:3000", "http://localhost:4321", "https://contextra-ai.vercel.app"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins or ["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
