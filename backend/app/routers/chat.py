@@ -14,6 +14,7 @@ from app.schemas.chat import (
     Reference,
     DetailedSummaryRequest,
     DetailedSummaryResponse,
+    TaskStatusResponse,
     FlashcardRequest,
     FlashcardResponse,
     Flashcard,
@@ -27,6 +28,7 @@ from app.services.chat_service import (
 from app.services.chat_service import update_chat_name
 from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards
 from app.repositories import message_repository
+from app.tasks import task_manager, start_summary_task
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -295,3 +297,37 @@ async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[Flash
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(exc)}")
+
+
+@router.post("/summary-task")
+async def create_summary_task(
+    user_id: int,
+    payload: DetailedSummaryRequest,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    task_id = start_summary_task({
+        "user_id": user_id,
+        "chat_id": payload.chat_id,
+        "topic_name": payload.topic_name,
+        "n_results": payload.n_results,
+        "max_tokens": payload.max_tokens,
+    })
+    return {"task_id": task_id}
+
+
+@router.get("/summary-task/{task_id}", response_model=TaskStatusResponse)
+def get_summary_task_status(
+    task_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return TaskStatusResponse(
+        task_id=task["id"],
+        status=task["status"],
+        result=DetailedSummaryResponse(**task["result"]) if task.get("result") else None,
+        error=task.get("error"),
+    )

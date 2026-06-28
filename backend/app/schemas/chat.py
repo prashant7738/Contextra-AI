@@ -90,3 +90,10 @@ class FlashcardResponse(BaseModel):
     flashcards: list[Flashcard]
     total_topics: int
     total_flashcards: int
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str  # pending | processing | done | error
+    result: Optional[DetailedSummaryResponse] = None
+    error: Optional[str] = None

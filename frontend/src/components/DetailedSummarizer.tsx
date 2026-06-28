@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import styles from './DetailedSummarizer.module.css';
 import { apiClient } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
@@ -40,7 +40,12 @@ export default function DetailedSummarizer() {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [errorMessage, setErrorMessage] = useState('');
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const mountedRef = useRef(true);
   const errorId = useId();
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -57,36 +62,48 @@ export default function DetailedSummarizer() {
     setErrorMessage('');
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({
-        user_id: String(userId),
-        n_results: String(parseInt(formData.resultsCount)),
-        max_tokens: '2000',
-      });
-
-      const payload: { topic_name: string; chat_id?: number } = {
+      const payload: { topic_name: string; chat_id?: number; n_results: number; max_tokens: number } = {
         topic_name: formData.topic || 'General',
+        n_results: parseInt(formData.resultsCount),
+        max_tokens: 2000,
       };
       if (formData.chatId) {
         payload.chat_id = parseInt(formData.chatId);
       }
 
-      const res = await apiClient.post<SummaryResult>(
-        `/chats/detailed-summarizer?${params.toString()}`,
+      const startRes = await apiClient.post<{ task_id: string }>(
+        `/chats/summary-task?user_id=${userId}`,
         payload,
-        { timeoutMs: 120_000 },
+        { timeoutMs: 30_000 },
       );
+      if (startRes.error) throw new Error(startRes.error);
+      const taskId = startRes.data!.task_id;
 
-      if (res.error) {
-        throw new Error(res.error);
+      while (mountedRef.current) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (!mountedRef.current) return;
+        const pollRes = await apiClient.get<{ status: string; result?: SummaryResult; error?: string }>(
+          `/chats/summary-task/${taskId}`,
+          { timeoutMs: 30_000 },
+        );
+        if (pollRes.error) throw new Error(pollRes.error);
+        const taskData = pollRes.data!;
+
+        if (taskData.status === 'done') {
+          if (mountedRef.current) {
+            setResults(taskData.result ? [taskData.result] : []);
+            setShowResults(true);
+            setExpandedCards(new Set());
+            setTimeout(() => {
+              resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
+          return;
+        }
+        if (taskData.status === 'error') {
+          throw new Error(taskData.error || 'Summary generation failed');
+        }
       }
-
-      setResults(res.data ? [res.data] : []);
-      setShowResults(true);
-      setExpandedCards(new Set());
-
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setErrorMessage(`Error fetching summaries: ${message}`);

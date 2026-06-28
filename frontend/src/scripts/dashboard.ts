@@ -615,10 +615,10 @@ import { renderMarkdown } from '../utils/markdown';
     const nResults = Number(summaryResults?.value || 5);
     const submitBtn = document.getElementById('summary-generate') as HTMLButtonElement | null;
     if (submitBtn) submitBtn.disabled = true;
-    summaryOutput.innerHTML = '<p class="empty">Generating summary...</p>';
+    summaryOutput.innerHTML = '<p class="empty">Starting summary generation...</p>';
 
     try {
-      const resp = await apiFetch(`/chats/detailed-summarizer?user_id=${user.id}`, {
+      const startResp = await apiFetch(`/chats/summary-task?user_id=${user.id}`, {
         method: 'POST',
         body: JSON.stringify({
           chat_id: selectedChatId,
@@ -626,12 +626,28 @@ import { renderMarkdown } from '../utils/markdown';
           n_results: nResults,
           max_tokens: 900,
         }),
-        timeoutMs: 120_000,
+        timeoutMs: 30_000,
       });
+      if (!startResp.ok) throw new Error(`${startResp.status}: ${await readError(startResp)}`);
+      const { task_id } = await startResp.json();
 
-      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
-      const data = await resp.json();
-      renderSummary(data);
+      summaryOutput.innerHTML = '<p class="empty">⏳ Generating summary... <span class="poll-dots"></span></p>';
+
+      let taskResp: any;
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const pollResp = await apiFetch(`/chats/summary-task/${task_id}`, { timeoutMs: 30_000 });
+        if (!pollResp.ok) throw new Error(`${pollResp.status}: ${await readError(pollResp)}`);
+        taskResp = await pollResp.json();
+
+        if (taskResp.status === 'done') {
+          renderSummary(taskResp.result);
+          return;
+        }
+        if (taskResp.status === 'error') {
+          throw new Error(taskResp.error || 'Summary generation failed');
+        }
+      }
     } catch (err: any) {
       console.error('Summary error:', err);
       summaryOutput.innerHTML = `<p class="empty">Unable to generate summary: ${escapeHtml(err.message)}</p>`;
