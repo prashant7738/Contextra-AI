@@ -40,22 +40,21 @@ def _supabase_presign(filename: str) -> tuple[str, str]:
     bucket = settings.supabase_storage_bucket
     object_path = f"uploads/{uuid.uuid4().hex}_{filename}"
 
-    url = f"{settings.supabase_url}/storage/v1/object/presign/upload/{bucket}/{object_path}"
+    url = f"{settings.supabase_url}/storage/v1/object/upload/sign/{bucket}/{object_path}"
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
     }
-    body = {"expiresIn": 3600}
 
-    resp = httpx.post(url, headers=headers, json=body, timeout=30)
+    resp = httpx.post(url, headers=headers, timeout=30)
     resp.raise_for_status()
     result = resp.json()
     upload_url = result.get("url")
 
     if not upload_url:
-        logger.error(f"Supabase presign response missing 'url': {result}")
-        raise RuntimeError("Failed to get presigned upload URL from Supabase")
+        logger.error(f"Supabase signed upload response missing 'url': {result}")
+        raise RuntimeError("Failed to get signed upload URL from Supabase")
 
-    logger.info(f"Presigned URL created for {object_path}")
+    logger.info(f"Signed upload URL created for {object_path}")
     return upload_url, object_path
 
 
