@@ -23,8 +23,8 @@ async def answer_query(question: str, user_id: int, chat_id: int, chat_history: 
     Returns:
         Tuple of (answer, references) where references are the source chunks used
     """
-    query_embedding = embed_texts([question])[0]
-    results = query_similar(query_embedding, n_results=10, user_id=user_id, chat_id=chat_id)
+    query_embedding = (await asyncio.to_thread(embed_texts, [question]))[0]
+    results = await asyncio.to_thread(query_similar, query_embedding, 10, user_id, chat_id)
     context = "\n\n".join(results.get("documents", [[]])[0])
     references = _extract_references(results)
     
@@ -75,8 +75,8 @@ async def generate_detailed_summary(
         else normalized_topic
     )
 
-    query_embedding = embed_texts([retrieval_query])[0]
-    results = query_similar(query_embedding, n_results=n_results, user_id=user_id, chat_id=chat_id)
+    query_embedding = (await asyncio.to_thread(embed_texts, [retrieval_query]))[0]
+    results = await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
 
     docs = results.get("documents", [[]])[0]
     if not docs:
