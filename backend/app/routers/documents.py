@@ -75,7 +75,7 @@ def presign_upload(
 
     task = IngestionTask(
         user_id=user_id,
-        chat_id=chat_id,
+        chat_id=chat.id,
         filename=body.filename or "file",
         status="pending_upload",
         storage_path=object_path,
@@ -153,7 +153,7 @@ async def direct_ingest(
 
     task = IngestionTask(
         user_id=user_id,
-        chat_id=chat_id,
+        chat_id=chat.id,
         filename=upload.filename or "file",
         status="pending",
         file_path=tmp_path,
