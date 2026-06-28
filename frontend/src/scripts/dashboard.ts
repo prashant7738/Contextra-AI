@@ -568,6 +568,8 @@ import { renderMarkdown } from '../utils/markdown';
     }
   }
 
+  const usePresignUpload = (import.meta.env.PUBLIC_UPLOAD_METHOD as string | undefined) === 'presign';
+
   async function uploadFile(file: File) {
     if (!file || !selectedChatId) return;
     const name = file.name || 'file';
@@ -578,21 +580,15 @@ import { renderMarkdown } from '../utils/markdown';
     setStatus(`Uploading ${file.name}...`, 'warning');
     if (uploadBtn) uploadBtn.disabled = true;
     try {
-      const formData = new FormData();
-      formData.append('files', file);
-      const resp = await apiFetch(
-        `/documents/ingest?user_id=${user.id}&chat_id=${selectedChatId}`,
-        { method: 'POST', body: formData, timeoutMs: 60_000 },
-      );
-      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
-      const { task_id, status } = await resp.json();
+      let taskId: number;
 
-      if (status === 'completed') {
-        setStatus(`Uploaded ${file.name}`, 'success');
+      if (usePresignUpload) {
+        taskId = await uploadViaPresign(file);
       } else {
-        setStatus(`Processing ${file.name}...`, 'warning');
-        await pollIngestionTask(task_id);
+        taskId = await uploadDirect(file);
       }
+
+      await pollIngestionTask(taskId);
 
       if (fileInput) fileInput.value = '';
       selectedUploadFile = null;
@@ -607,6 +603,41 @@ import { renderMarkdown } from '../utils/markdown';
     } finally {
       if (uploadBtn) uploadBtn.disabled = false;
     }
+  }
+
+  async function uploadDirect(file: File): Promise<number> {
+    const formData = new FormData();
+    formData.append('files', file);
+    const resp = await apiFetch(
+      `/documents/ingest/direct?user_id=${user.id}&chat_id=${selectedChatId}`,
+      { method: 'POST', body: formData, timeoutMs: 300_000 },
+    );
+    if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
+    const data = await resp.json();
+    return data.task_id;
+  }
+
+  async function uploadViaPresign(file: File): Promise<number> {
+    const presignResp = await apiFetch(
+      `/documents/ingest/presign?user_id=${user.id}&chat_id=${selectedChatId}`,
+      { method: 'POST', body: JSON.stringify({ filename: file.name }) },
+    );
+    if (!presignResp.ok) throw new Error(`${presignResp.status}: ${await readError(presignResp)}`);
+    const { task_id, upload_url } = await presignResp.json();
+
+    const uploadResp = await fetch(upload_url, {
+      method: 'PUT',
+      body: file,
+    });
+    if (!uploadResp.ok) throw new Error(`Storage upload failed: ${uploadResp.status}`);
+
+    const confirmResp = await apiFetch(
+      `/documents/ingest/${task_id}/confirm?user_id=${user.id}`,
+      { method: 'POST' },
+    );
+    if (!confirmResp.ok) throw new Error(`${confirmResp.status}: ${await readError(confirmResp)}`);
+
+    return task_id;
   }
 
   async function pollIngestionTask(taskId: number): Promise<void> {

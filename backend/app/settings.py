@@ -4,8 +4,16 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     database_url: str = ""
     hf_token: str = ""
-    # Admin configuration
     admin_email: str = ""
+
+    # Supabase Storage (leave empty to keep using direct upload)
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_storage_bucket: str = "documents"
+
+    # Embedding provider: "local", "openai", "huggingface"
+    embedding_provider: str = "local"
+    openai_api_key: str = ""
 
     # JWT Configuration
     secret_key: str = "your-secret-key-change-this-in-production"

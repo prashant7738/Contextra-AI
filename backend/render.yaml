@@ -23,3 +23,15 @@ services:
         value: "7"
       - key: PYTHON_VERSION
         value: "3.12.0"
+      # Supabase Storage (optional — leave empty to keep direct upload)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: documents
+      # Embedding provider: "local" | "openai" | "huggingface"
+      - key: EMBEDDING_PROVIDER
+        value: huggingface
+      - key: OPENAI_API_KEY
+        sync: false

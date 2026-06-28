@@ -1,5 +1,5 @@
 from app.core.chunker import chunk_document
-from app.core.embedder import embed_texts
+from app.core.embeddings import embed_texts
 from app.repositories.pgvector_repository import store_embeddings
 
 

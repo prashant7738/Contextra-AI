@@ -14,5 +14,6 @@ class IngestionTask(Base):
     chunks_count = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     file_path = Column(String, nullable=True)
+    storage_path = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
