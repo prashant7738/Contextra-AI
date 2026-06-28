@@ -582,25 +582,55 @@ import { renderMarkdown } from '../utils/markdown';
       formData.append('files', file);
       const resp = await apiFetch(
         `/documents/ingest?user_id=${user.id}&chat_id=${selectedChatId}`,
-        { method: 'POST', body: formData, timeoutMs: 120_000 },
+        { method: 'POST', body: formData, timeoutMs: 60_000 },
       );
       if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
-      const results = await resp.json();
-      const r = results[0];
-      if (r.status === 'embedded and stored') {
-        setStatus(`Uploaded ${file.name} — ${r.chunks_count} chunks indexed`, 'success');
+      const { task_id, status } = await resp.json();
+
+      if (status === 'completed') {
+        setStatus(`Uploaded ${file.name}`, 'success');
       } else {
-        setStatus(`Upload issue: ${r.status}`, 'warning');
+        setStatus(`Processing ${file.name}...`, 'warning');
+        await pollIngestionTask(task_id);
       }
+
       if (fileInput) fileInput.value = '';
       selectedUploadFile = null;
       try { if (selectedChatId) await renderChatDocuments(selectedChatId); } catch (e) { console.debug('Refresh docs after upload failed', e); }
     } catch (err: any) {
       console.error('Upload error:', err);
-      setStatus(`Upload failed: ${err.message}`, 'danger');
+      if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+        setStatus('Upload timed out. Try a smaller PDF or check your connection.', 'danger');
+      } else {
+        setStatus(`Upload failed: ${err.message}`, 'danger');
+      }
     } finally {
       if (uploadBtn) uploadBtn.disabled = false;
     }
+  }
+
+  async function pollIngestionTask(taskId: number): Promise<void> {
+    const maxAttempts = 300;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const resp = await apiFetch(
+        `/documents/ingest/status/${taskId}?user_id=${user.id}`,
+        { timeoutMs: 10_000 },
+      );
+      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
+      const data = await resp.json();
+      if (data.status === 'completed') {
+        setStatus(`Uploaded — ${data.chunks_count} chunks indexed`, 'success');
+        return;
+      }
+      if (data.status === 'failed') {
+        throw new Error(data.error_message || 'Processing failed');
+      }
+      if (i > 0 && i % 10 === 0) {
+        setStatus(`Processing... (${Math.round(i * 2)}s)`, 'warning');
+      }
+    }
+    throw new Error('Processing timed out after 10 minutes');
   }
 
   async function generateSummary(ev: Event) {
