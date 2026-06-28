@@ -28,7 +28,8 @@ from app.services.chat_service import (
 from app.services.chat_service import update_chat_name
 from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards
 from app.repositories import message_repository
-from app.tasks import task_manager, start_summary_task
+from app.tasks import start_summary_task
+from app.models import SummaryTask
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
@@ -303,11 +304,12 @@ async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[Flash
 async def create_summary_task(
     user_id: int,
     payload: DetailedSummaryRequest,
+    db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
 ):
     if user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
-    task_id = start_summary_task({
+    task_id = start_summary_task(db, {
         "user_id": user_id,
         "chat_id": payload.chat_id,
         "topic_name": payload.topic_name,
@@ -320,14 +322,17 @@ async def create_summary_task(
 @router.get("/summary-task/{task_id}", response_model=TaskStatusResponse)
 def get_summary_task_status(
     task_id: str,
+    db: Session = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
 ):
-    task = task_manager.get_task(task_id)
+    task = db.query(SummaryTask).filter(SummaryTask.id == task_id).first()
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: task doesn't belong to you")
     return TaskStatusResponse(
-        task_id=task["id"],
-        status=task["status"],
-        result=DetailedSummaryResponse(**task["result"]) if task.get("result") else None,
-        error=task.get("error"),
+        task_id=task.id,
+        status=task.status,
+        result=DetailedSummaryResponse(**task.result) if task.result else None,
+        error=task.error,
     )

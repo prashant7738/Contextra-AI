@@ -1,5 +1,5 @@
 import asyncio
-from app.core.embedder import embed_texts
+from app.core.embeddings import embed_texts
 from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm
 from app.repositories.pgvector_repository import query_similar
 from app.services.flashcard_parsing import (
