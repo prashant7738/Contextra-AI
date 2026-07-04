@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.routers import documents, chat, auth
 from app.routers import admin
+from app.routers import cron
 from app.settings import settings
 import os
 import sys
@@ -56,6 +57,7 @@ app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(cron.router)
 
 
 @app.get("/")

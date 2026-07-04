@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     hf_token: str = ""
     admin_email: str = ""
+    cron_secret: str = ""
 
     # Supabase Storage (leave empty to keep using direct upload)
     supabase_url: str = ""

@@ -309,9 +309,12 @@ async def create_summary_task(
 ):
     if user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    chat = get_chat(db, payload.chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
     task_id = start_summary_task(db, {
         "user_id": user_id,
-        "chat_id": payload.chat_id,
+        "chat_id": chat.id,
         "topic_name": payload.topic_name,
         "n_results": payload.n_results,
         "max_tokens": payload.max_tokens,
