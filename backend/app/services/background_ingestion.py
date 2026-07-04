@@ -24,6 +24,7 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
     task = None
     local_path = None
     try:
+        logger.info(f"Starting ingestion task {task_id}: process_ingestion_task(use_ocr={use_ocr})")
         task = db.query(IngestionTask).filter(IngestionTask.id == task_id).first()
         if not task:
             logger.error(f"IngestionTask {task_id} not found")
@@ -36,8 +37,10 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         db.commit()
 
         if task.storage_path:
+            logger.info(f"Task {task_id}: downloading file via download_file() from storage_path={task.storage_path}")
             local_path = download_file(task.storage_path)
         elif task.file_path:
+            logger.info(f"Task {task_id}: using local file_path={task.file_path}")
             local_path = task.file_path
         else:
             raise FileNotFoundError("No file_path or storage_path on task")
@@ -48,6 +51,7 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         with open(local_path, "rb") as f:
             contents = f.read()
 
+        logger.info(f"Task {task_id}: opening PDF with fitz.open()");
         doc = fitz.open(stream=contents, filetype="pdf")
 
         full_text = ""
@@ -70,7 +74,9 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
 
         logger.info(f"Extraction done: {extraction_stats}")
 
+        logger.info(f"Task {task_id}: creating document record")
         document = create_document(db, task.user_id, task.chat_id, task.filename, full_text)
+        logger.info(f"Task {task_id}: ingesting text into embeddings and postgres")
         chunks_count = ingest_text(
             pages_data,
             user_id=task.user_id,
@@ -86,7 +92,7 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         db.commit()
 
     except Exception as e:
-        logger.error(f"Error processing ingestion task {task_id}: {str(e)}")
+        logger.exception(e)
         if task is not None:
             try:
                 task.status = "failed"
