@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 import uuid
+from urllib.parse import urlparse
 
 import httpx
 
@@ -67,11 +68,17 @@ def _supabase_presign(filename: str) -> tuple[str, str]:
 def _supabase_download(object_path: str) -> str:
     bucket = settings.supabase_storage_bucket
     url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{object_path}"
+    logger.info(f"Download URL: {url}")
+    logger.info(f"Hostname: {urlparse(url).hostname}")
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
     }
 
-    resp = httpx.get(url, headers=headers, timeout=120)
+    try:
+        resp = httpx.get(url, headers=headers, timeout=120)
+    except Exception:
+        logger.exception("Supabase download failed")
+        raise
     resp.raise_for_status()
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
