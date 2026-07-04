@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.chat import Chat, ChatMessage
 from app.models.document import Document
 from app.models.embedding import Embedding
+from app.models.ingestion_task import IngestionTask
 
 
 def get_chat_by_id(db: Session, chat_id: int) -> Chat | None:
@@ -45,6 +46,8 @@ def delete_chat(db: Session, chat_id: int, user_id: int) -> bool:
         return False
     # remove all messages that reference this chat to avoid FK violations
     db.query(ChatMessage).filter(ChatMessage.chat_id == chat.id).delete()
+    # remove ingestion tasks that reference this chat to avoid FK violations
+    db.query(IngestionTask).filter(IngestionTask.chat_id == chat.id).delete()
     # remove embeddings first (FK references documents)
     db.query(Embedding).filter(Embedding.chat_id == chat.id).delete()
     # remove all documents that reference this chat to avoid FK violations
