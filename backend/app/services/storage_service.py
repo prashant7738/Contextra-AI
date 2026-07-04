@@ -48,6 +48,7 @@ def _supabase_presign(filename: str) -> tuple[str, str]:
     resp = httpx.post(url, headers=headers, timeout=30)
     resp.raise_for_status()
     result = resp.json()
+    logger.info(f"Supabase presign response: {result}")
     upload_url = result.get("url")
 
     if not upload_url:
@@ -55,7 +56,9 @@ def _supabase_presign(filename: str) -> tuple[str, str]:
         raise RuntimeError("Failed to get signed upload URL from Supabase")
 
     if upload_url.startswith("/"):
-        upload_url = f"{settings.supabase_url}{upload_url}"
+        upload_url = f"{settings.supabase_url.rstrip('/')}/storage/v1{upload_url}"
+
+    logger.info(f"Supabase upload URL: {upload_url}")
 
     logger.info(f"Signed upload URL created for {object_path}")
     return upload_url, object_path
