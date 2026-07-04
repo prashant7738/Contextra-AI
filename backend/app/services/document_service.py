@@ -31,9 +31,9 @@ def create_document(db: Session, user_id: int, chat_id: int, filename: str, cont
     if user is None:
         raise ValueError(f"User with ID {user_id} not found")
     
-    # Verify chat exists and belongs to the user (chat_id is local_id)
-    chat = chat_repository.get_chat_for_user(db, chat_id, user_id)
-    if chat is None:
+    # Verify chat exists and belongs to the user (chat_id is the database chat.id)
+    chat = chat_repository.get_chat_by_id(db, chat_id)
+    if chat is None or chat.user_id != user_id:
         raise ValueError(f"Chat with ID {chat_id} not found or doesn't belong to user {user_id}")
 
     # Create document record (use global chat.id)
