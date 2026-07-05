@@ -65,7 +65,7 @@ export default function DetailedSummarizer() {
       const payload: { topic_name: string; chat_id?: number; n_results: number; max_tokens: number } = {
         topic_name: formData.topic || 'General',
         n_results: parseInt(formData.resultsCount),
-        max_tokens: 2000,
+        max_tokens: 1000,
       };
       if (formData.chatId) {
         payload.chat_id = parseInt(formData.chatId);

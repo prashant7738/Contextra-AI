@@ -78,6 +78,7 @@ async def _run_summary_task_async(task_id: str, params: dict, db: Session):
 
     if normalized_topic and normalized_topic != "all":
         initial_answer, _ = await answer_query(
+            db=db,
             question=topic_name,
             user_id=user_id,
             chat_id=chat.id,
@@ -85,6 +86,7 @@ async def _run_summary_task_async(task_id: str, params: dict, db: Session):
         )
 
     summary, title, sections, references, chunks_used = await generate_detailed_summary(
+        db=db,
         topic_name=topic_name or "all",
         user_id=user_id,
         chat_id=chat.id,

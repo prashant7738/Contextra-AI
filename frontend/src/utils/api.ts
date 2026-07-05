@@ -213,6 +213,9 @@ export const apiClient = {
   put: <T = unknown, B = unknown>(endpoint: string, body: B, options?: ApiRequestOptions) =>
     makeRequest<T>(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
 
+  patch: <T = unknown, B = unknown>(endpoint: string, body: B, options?: ApiRequestOptions) =>
+    makeRequest<T>(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
+
   delete: <T = unknown>(endpoint: string, options?: ApiRequestOptions) =>
     makeRequest<T>(endpoint, { ...options, method: 'DELETE' }),
 

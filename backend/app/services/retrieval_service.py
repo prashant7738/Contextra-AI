@@ -6,11 +6,20 @@ from app.services.flashcard_parsing import (
     parse_flashcard_json_fallback,
     parse_flashcard_marker_output,
 )
+from app.services.token_budget_service import consume_user_tokens, estimate_token_cost
 import json
 import re
+from sqlalchemy.orm import Session
 
 
-async def answer_query(question: str, user_id: int, chat_id: int, chat_history: list = None) -> tuple[str, list[dict]]:
+async def answer_query(
+    db: Session,
+    question: str,
+    user_id: int,
+    chat_id: int,
+    chat_history: list = None,
+    max_tokens: int = 800,
+) -> tuple[str, list[dict]]:
     """
     Answer a query within a specific chat context.
     
@@ -39,10 +48,12 @@ async def answer_query(question: str, user_id: int, chat_id: int, chat_history: 
     
     # Combine contexts: history + document context
     full_context = context + history_context
-    return await ask_llm(full_context, question), references
+    consume_user_tokens(db, user_id, estimate_token_cost(full_context, question, max_tokens=max_tokens))
+    return await ask_llm(full_context, question, max_tokens=max_tokens), references
 
 
 async def generate_detailed_summary(
+    db: Session,
     topic_name: str,
     user_id: int,
     chat_id: int,
@@ -96,6 +107,7 @@ async def generate_detailed_summary(
     else:
         full_context = context
     
+    consume_user_tokens(db, user_id, estimate_token_cost(full_context, normalized_topic, max_tokens=max_tokens))
     summary_output = await ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
     summary, title, sections = _parse_detailed_summary_output(summary_output, normalized_topic)
     return summary, title, sections, references, len(docs)
@@ -189,6 +201,7 @@ def _format_detailed_summary_text(title: str, sections: list[dict]) -> str:
 
 
 async def generate_flashcards(
+    db: Session,
     user_id: int,
     chat_id: int,
     n_results: int = 5,
@@ -224,6 +237,7 @@ async def generate_flashcards(
     references = _extract_references(results)
     
     # Step 2: Generate flashcards using LLM
+    consume_user_tokens(db, user_id, estimate_token_cost(context, max_tokens=max_tokens))
     flashcards_output = await generate_flashcards_llm(context, max_tokens=max_tokens)
     
     # Step 3: Parse response in marker format first, then JSON as fallback

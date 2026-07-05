@@ -157,7 +157,7 @@ async def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(ge
         chat_history = message_repository.get_chat_history(db, chat.id, user_id, limit=10)
         
         # Answer query with chat history context
-        answer, references = await answer_query(query.request, user_id, chat.id, chat_history=chat_history)
+        answer, references = await answer_query(db, query.request, user_id, chat.id, chat_history=chat_history)
         
         # Save the message and response to history
         saved_message = message_repository.save_message(db, chat.id, user_id, query.request, answer)
@@ -204,14 +204,16 @@ async def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db:
         # Only call answer_query for specific topics, not for "all"
         if normalized_topic and normalized_topic != "all":
             initial_answer, _ = await answer_query(
+                db=db,
                 question=payload.topic_name,
                 user_id=user_id,
                 chat_id=chat.id,
-                chat_history=None
+                chat_history=None,
             )
         
         # Generate detailed summary with optional pre-generated answer as context
         summary, title, sections, references, chunks_used = await generate_detailed_summary(
+            db=db,
             topic_name=payload.topic_name or "all",
             user_id=user_id,
             chat_id=chat.id,
@@ -268,6 +270,7 @@ async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[Flash
         max_tokens = payload.max_tokens if payload else 1000
         
         flashcards, references = await generate_flashcards(
+            db=db,
             user_id=user_id,
             chat_id=chat.id,
             n_results=n_results,

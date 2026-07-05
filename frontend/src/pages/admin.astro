@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <BaseLayout title="Admin – Contextra AI" requireAuth>
   <main class="admin-root" id="main">
     <h1 class="title">Admin Panel</h1>
-    <p class="subtitle">User list and chat inspection (admin only)</p>
+    <p class="subtitle">User list, token caps, and chat inspection (admin only)</p>
 
     <section id="content">
       <div id="loading">Loading users…</div>
@@ -22,15 +22,70 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     .user-card p{margin:0;color:#5b6b7b;font-size:13px}
     .small{font-size:12px;color:#7b8997;margin-top:8px}
     a.chats-link{display:inline-block;margin-top:10px;color:#0b66ff;text-decoration:none}
+    .quota-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+    .quota-row input{flex:1;min-width:120px;padding:8px 10px;border:1px solid #d9e2ec;border-radius:8px;background:#fff;color:#0b1220}
+    .quota-row button{padding:8px 12px;border:0;border-radius:8px;background:#0b66ff;color:#fff;cursor:pointer}
+    .quota-row button:disabled{opacity:0.6;cursor:wait}
+    .status{font-size:12px;margin-top:8px;color:#41515f;min-height:1.2em}
   </style>
 
   <script>
     import { apiClient } from '../utils/api';
 
-    interface AdminUser { id: number; name: string; email: string }
+    interface AdminUser { id: number; name: string; email: string; token_limit: number; tokens_used: number }
 
     const usersEl = document.getElementById('users') as HTMLUListElement | null;
     const loadingEl = document.getElementById('loading') as HTMLElement | null;
+
+    function renderUserCard(u: AdminUser) {
+      const remaining = Math.max(u.token_limit - u.tokens_used, 0);
+      return `
+        <li class="user-card" data-user-id="${u.id}">
+          <h3>${u.name}</h3>
+          <p>${u.email}</p>
+          <p class="small">Used ${u.tokens_used.toLocaleString()} of ${u.token_limit.toLocaleString()} tokens</p>
+          <div class="quota-row">
+            <input type="number" min="1000" step="100" value="${u.token_limit}" aria-label="Token limit for ${u.email}" />
+            <button type="button">Save</button>
+          </div>
+          <div class="status">Remaining: ${remaining.toLocaleString()}</div>
+          <a class="chats-link" href="/admin/user-chats?id=${u.id}">View chats</a>
+        </li>`;
+    }
+
+    async function bindQuotaControls() {
+      if (!usersEl) return;
+      const cards = Array.from(usersEl.querySelectorAll('.user-card'));
+      for (const card of cards) {
+        const userId = Number(card.getAttribute('data-user-id'));
+        const input = card.querySelector('input') as HTMLInputElement | null;
+        const button = card.querySelector('button') as HTMLButtonElement | null;
+        const status = card.querySelector('.status') as HTMLElement | null;
+        if (!input || !button || !status || Number.isNaN(userId)) continue;
+
+        button.addEventListener('click', async () => {
+          const tokenLimit = Number(input.value);
+          if (!Number.isFinite(tokenLimit) || tokenLimit < 1000) {
+            status.textContent = 'Enter a limit of at least 1000 tokens.';
+            return;
+          }
+
+          button.disabled = true;
+          status.textContent = 'Saving...';
+          const res = await apiClient.patch<AdminUser>(`/admin/users/${userId}/token-limit`, { token_limit: tokenLimit });
+          button.disabled = false;
+
+          if (res.error || !res.data) {
+            status.textContent = `Error: ${res.error ?? 'Unable to update limit'}`;
+            return;
+          }
+
+          const updated = res.data;
+          input.value = String(updated.token_limit);
+          status.textContent = `Remaining: ${Math.max(updated.token_limit - updated.tokens_used, 0).toLocaleString()}`;
+        });
+      }
+    }
 
     async function loadUsers() {
       if (!usersEl || !loadingEl) return;
@@ -46,16 +101,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         usersEl.innerHTML = '<li class="user-card">No users found</li>';
         return;
       }
-      usersEl.innerHTML = users
-        .map(
-          (u) => `
-        <li class="user-card">
-          <h3>${u.name}</h3>
-          <p>${u.email}</p>
-          <a class="chats-link" href="/admin/user-chats?id=${u.id}">View chats</a>
-        </li>`
-        )
-        .join('');
+      usersEl.innerHTML = users.map((u) => renderUserCard(u)).join('');
+      await bindQuotaControls();
     }
     loadUsers();
   </script>

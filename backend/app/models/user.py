@@ -9,3 +9,5 @@ class User(Base):
     name = Column(String)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String)
+    token_limit = Column(Integer, nullable=False, default=25000)
+    tokens_used = Column(Integer, nullable=False, default=0)

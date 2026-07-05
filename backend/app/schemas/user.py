@@ -11,5 +11,7 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: str
+    token_limit: int
+    tokens_used: int
 
     model_config = {"from_attributes": True}
