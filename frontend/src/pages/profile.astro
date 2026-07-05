@@ -71,10 +71,6 @@ import ThemeToggle from '../components/ThemeToggle.astro';
               <span class="profile-field-label">Email</span>
               <span id="pf-email" class="profile-field-value">—</span>
             </div>
-            <div class="profile-field">
-              <span class="profile-field-label">User ID</span>
-              <span id="pf-id" class="profile-field-value muted">—</span>
-            </div>
           </div>
 
           <div class="profile-actions">
@@ -234,7 +230,6 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 
         const fullName = user.name || 'Unknown';
         const email = user.email || '—';
-        const userId = user.id ?? '—';
         const initials = fullName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
         const setText = (id: string, value: string) => {
@@ -246,7 +241,6 @@ import ThemeToggle from '../components/ThemeToggle.astro';
         setText('profile-email', email);
         setText('pf-name', fullName);
         setText('pf-email', email);
-        setText('pf-id', String(userId));
 
         document.getElementById('profile-logout-btn')?.addEventListener('click', () => {
           ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));

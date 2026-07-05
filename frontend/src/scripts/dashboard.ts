@@ -55,6 +55,7 @@ import { renderMarkdown } from '../utils/markdown';
   const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
   const uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement | null;
   const dropzoneLabel = document.getElementById('dropzone-label');
+  const uploadPreview = document.getElementById('upload-preview');
   const statusLine = document.getElementById('status-line');
   const connectionPill = document.getElementById('connection-pill');
 
@@ -96,6 +97,7 @@ import { renderMarkdown } from '../utils/markdown';
   let selectedChatId: number | null = null;
   let selectedUploadFile: File | null = null;
   const flashcardExpanded = new Set<number>();
+  let topbarSyncRaf = 0;
 
   function setConnection(text: string, tone?: string) {
     if (!connectionPill) return;
@@ -109,6 +111,31 @@ import { renderMarkdown } from '../utils/markdown';
     statusLine.textContent = msg;
     if (tone) statusLine.dataset.tone = tone;
     else delete statusLine.dataset.tone;
+  }
+
+  function shouldFixTopbar() {
+    return window.matchMedia && window.matchMedia('(min-width: 1101px)').matches;
+  }
+
+  function syncTopbarChrome() {
+    if (!topbar) return;
+    const shouldFix = Boolean(selectedChatId) && shouldFixTopbar();
+    topbar.classList.toggle('fixed', shouldFix);
+    document.body.classList.toggle('has-fixed-topbar', shouldFix);
+    if (shouldFix) {
+      const offset = Math.ceil(topbar.getBoundingClientRect().height + 24);
+      document.body.style.setProperty('--fixed-topbar-offset', `${offset}px`);
+    } else {
+      document.body.style.removeProperty('--fixed-topbar-offset');
+    }
+  }
+
+  function scheduleTopbarSync() {
+    if (topbarSyncRaf) cancelAnimationFrame(topbarSyncRaf);
+    topbarSyncRaf = requestAnimationFrame(() => {
+      topbarSyncRaf = 0;
+      syncTopbarChrome();
+    });
   }
 
   async function readError(resp: Response): Promise<string> {
@@ -143,6 +170,8 @@ import { renderMarkdown } from '../utils/markdown';
           try { updateTopbarButtons(); } catch {}
         }
       }
+
+      scheduleTopbarSync();
 
       setConnection('Connected', 'success');
     } catch (err) {
@@ -308,10 +337,7 @@ import { renderMarkdown } from '../utils/markdown';
     if (activeBtn) activeBtn.classList.add('chat-item-active');
     if (composer) composer.hidden = false;
     try { updateTopbarButtons(); } catch {}
-    if (topbar) {
-      topbar.classList.add('fixed');
-      document.body.classList.add('has-fixed-topbar');
-    }
+    syncTopbarChrome();
     setStatus('');
     resetSummary();
     clearFlashcards();
@@ -577,8 +603,10 @@ import { renderMarkdown } from '../utils/markdown';
       setStatus('Only PDF files are supported', 'danger');
       return;
     }
+    const currentSelection = selectedUploadFile;
     setStatus(`Uploading ${file.name}...`, 'warning');
     if (uploadBtn) uploadBtn.disabled = true;
+    renderUploadSelection('uploading');
     try {
       let taskId: number;
 
@@ -590,8 +618,11 @@ import { renderMarkdown } from '../utils/markdown';
 
       await pollIngestionTask(taskId);
 
-      if (fileInput) fileInput.value = '';
-      selectedUploadFile = null;
+      if (selectedUploadFile === currentSelection) {
+        clearUploadSelection();
+      } else {
+        renderUploadSelection(selectedUploadFile ? 'ready' : 'idle');
+      }
       try { if (selectedChatId) await renderChatDocuments(selectedChatId); } catch (e) { console.debug('Refresh docs after upload failed', e); }
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -879,9 +910,67 @@ import { renderMarkdown } from '../utils/markdown';
     selectedUploadFile = file;
     if (!file) {
       setStatus('No file selected', 'warning');
+      renderUploadSelection('idle');
       return;
     }
     setStatus(`Selected ${file.name}`, 'success');
+    renderUploadSelection('ready');
+  }
+
+  function clearUploadSelection() {
+    selectedUploadFile = null;
+    if (fileInput) fileInput.value = '';
+    renderUploadSelection('idle');
+    setStatus('No file selected', 'warning');
+  }
+
+  function formatFileSize(bytes: number) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+  }
+
+  function renderUploadSelection(state: 'idle' | 'ready' | 'uploading') {
+    if (!uploadPreview) return;
+    if (!selectedUploadFile) {
+      uploadPreview.hidden = true;
+      uploadPreview.innerHTML = '';
+      delete uploadPreview.dataset.state;
+      return;
+    }
+
+    uploadPreview.hidden = false;
+    uploadPreview.dataset.state = state;
+    uploadPreview.innerHTML = `
+      <div class="upload-preview-card">
+        <div class="upload-preview-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <path d="M9 14h6"/>
+            <path d="M9 18h6"/>
+          </svg>
+        </div>
+        <div class="upload-preview-copy">
+          <span class="upload-preview-label">${state === 'uploading' ? 'Uploading PDF' : 'Selected PDF'}</span>
+          <strong class="upload-preview-name">${escapeHtml(selectedUploadFile.name)}</strong>
+          <span class="upload-preview-meta">${formatFileSize(selectedUploadFile.size)}${state === 'uploading' ? ' · in progress' : ''}</span>
+        </div>
+        <button class="upload-preview-remove" type="button" data-upload-remove>${state === 'uploading' ? 'Pending' : 'Remove'}</button>
+      </div>
+    `;
+
+    uploadPreview.querySelector('[data-upload-remove]')?.addEventListener('click', (ev: any) => {
+      ev.preventDefault();
+      if (state === 'uploading') return;
+      clearUploadSelection();
+    });
   }
 
   function setupResizableRails() {
@@ -1124,6 +1213,8 @@ import { renderMarkdown } from '../utils/markdown';
       profileMenuToggle?.setAttribute('aria-expanded', 'false');
     }
   });
+
+  window.addEventListener('resize', scheduleTopbarSync);
 
   setupResizableRails();
   loadChats();
