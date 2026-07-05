@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 BROAD_FALLBACK_QUERY = "Provide a high-yield summary of these study notes"
 
+_FILENAME_HINT_PATTERN = re.compile(r"(?:\b|['\"])([A-Za-z0-9_-]+(?:\.pdf)?)(?:\b|['\"])", re.IGNORECASE)
+
 
 async def _retrieve_context(
     queries: list[str],
@@ -81,7 +83,7 @@ async def answer_query(
         Tuple of (answer, references) where references are the source chunks used
     """
     docs, references = await _retrieve_context(
-        queries=[question, BROAD_FALLBACK_QUERY],
+        queries=_build_question_queries(question),
         user_id=user_id,
         chat_id=chat_id,
         n_results=max(10, max_tokens // 80),
@@ -105,6 +107,31 @@ async def answer_query(
     full_context = context + history_context
     consume_user_tokens(db, user_id, estimate_token_cost(full_context, question, max_tokens=max_tokens))
     return await ask_llm(full_context, question, max_tokens=max_tokens), references
+
+
+def _build_question_queries(question: str) -> list[str]:
+    filename_queries = _extract_filename_queries(question)
+    queries = filename_queries + [question] if filename_queries else [question]
+    queries.append(BROAD_FALLBACK_QUERY)
+    return _dedupe_text_list(queries)
+
+
+def _extract_filename_queries(question: str) -> list[str]:
+    lowered = question.lower()
+    hints: list[str] = []
+
+    for match in _FILENAME_HINT_PATTERN.finditer(question):
+        token = match.group(1).strip().strip(".,:;!?)")
+        if not token:
+            continue
+
+        normalized = token.lower()
+        if normalized.endswith(".pdf"):
+            hints.append(normalized)
+        elif "file" in lowered and any(ch.isdigit() for ch in normalized):
+            hints.extend([normalized, f"{normalized}.pdf"])
+
+    return _dedupe_text_list(hints)
 
 
 async def generate_detailed_summary(

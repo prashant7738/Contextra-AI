@@ -141,30 +141,35 @@ async def direct_ingest(
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
 
-    upload = uploaded_files[0]
-    contents = await upload.read()
+    created_tasks: list[IngestionTask] = []
+    for upload in uploaded_files:
+        contents = await upload.read()
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
-    try:
-        tmp.write(contents)
-        tmp_path = tmp.name
-    finally:
-        tmp.close()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
+        try:
+            tmp.write(contents)
+            tmp_path = tmp.name
+        finally:
+            tmp.close()
 
-    task = IngestionTask(
-        user_id=user_id,
-        chat_id=chat.id,
-        filename=upload.filename or "file",
-        status="pending",
-        file_path=tmp_path,
-    )
-    db.add(task)
+        task = IngestionTask(
+            user_id=user_id,
+            chat_id=chat.id,
+            filename=upload.filename or "file",
+            status="pending",
+            file_path=tmp_path,
+        )
+        db.add(task)
+        created_tasks.append(task)
+
     db.commit()
-    db.refresh(task)
 
-    background_tasks.add_task(process_ingestion_task, task.id, use_ocr)
+    for task in created_tasks:
+        db.refresh(task)
+        background_tasks.add_task(process_ingestion_task, task.id, use_ocr)
 
-    return TaskCreatedResponse(task_id=task.id, status="pending")
+    first_task = created_tasks[0]
+    return TaskCreatedResponse(task_id=first_task.id, status="pending")
 
 
 @router.get("/ingest/status/{task_id}", response_model=TaskStatusResponse)
