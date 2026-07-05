@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import styles from './DetailedSummarizer.module.css';
 import { apiClient } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
@@ -91,9 +91,8 @@ export default function DetailedSummarizer() {
 
         if (taskData.status === 'done') {
           if (mountedRef.current) {
-            setResults(taskData.result ? [taskData.result] : []);
+            setResults((prev) => (taskData.result ? [...prev, taskData.result] : prev));
             setShowResults(true);
-            setExpandedCards(new Set());
             setTimeout(() => {
               resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
