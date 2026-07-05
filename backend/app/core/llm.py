@@ -56,7 +56,11 @@ Create an 80/20 summary from the provided notes.
 
 Rules:
 - Return only the highest-yield 20% concepts that cover about 80% of the learning value.
-- Keep it concise and easy for students to revise quickly.
+- Make the Core Concepts section the longest and most detailed part of the answer.
+- Core Concepts should usually contain 5 to 8 items, and each item should be 2 to 4 sentences long.
+- For each Core Concepts item, explain what it is, why it matters, and include a simple example or analogy when helpful.
+- Keep Must Remember shorter and sharper, usually 3 to 5 concise items.
+- Keep Quick Revision Checklist brief and practical, usually 4 to 6 short checklist-style items.
 - Do not add information that is not present in the context.
 - If context is insufficient, explicitly mention the limitation.
 - Return valid JSON only.
