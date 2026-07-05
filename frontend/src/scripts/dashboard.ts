@@ -99,6 +99,27 @@ import { renderMarkdown } from '../utils/markdown';
   const flashcardExpanded = new Set<number>();
   let topbarSyncRaf = 0;
 
+  function getChatCacheKey(kind: 'summary' | 'flashcards', chatId: number) {
+    return `dashboard_${kind}_cache_${user.id}_${chatId}`;
+  }
+
+  function readChatCache(kind: 'summary' | 'flashcards', chatId: number) {
+    try {
+      const raw = localStorage.getItem(getChatCacheKey(kind, chatId));
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeChatCache(kind: 'summary' | 'flashcards', chatId: number, value: any) {
+    try {
+      localStorage.setItem(getChatCacheKey(kind, chatId), JSON.stringify(value));
+    } catch {
+      /* ignore storage failures */
+    }
+  }
+
   function setConnection(text: string, tone?: string) {
     if (!connectionPill) return;
     connectionPill.textContent = text;
@@ -344,6 +365,7 @@ import { renderMarkdown } from '../utils/markdown';
     await loadMessages(localId);
 
     try { await renderChatDocuments(localId); } catch (e) { console.debug('Refresh docs on select failed', e); }
+    restoreCachedChatArtifacts(localId);
 
     try {
       if (composer) composer.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -734,6 +756,14 @@ import { renderMarkdown } from '../utils/markdown';
 
         if (taskResp.status === 'done') {
           renderSummary(taskResp.result);
+          if (selectedChatId) {
+            writeChatCache('summary', selectedChatId, {
+              data: taskResp.result,
+              topic,
+              nResults,
+              updatedAt: new Date().toISOString(),
+            });
+          }
           return;
         }
         if (taskResp.status === 'error') {
@@ -796,6 +826,16 @@ import { renderMarkdown } from '../utils/markdown';
     `;
   }
 
+  function restoreSummaryFromCache(chatId: number) {
+    if (!summaryOutput) return false;
+    const cached = readChatCache('summary', chatId);
+    if (!cached?.data) return false;
+    renderSummary(cached.data);
+    if (summaryTopic && cached.topic) summaryTopic.value = cached.topic;
+    if (summaryResults && cached.nResults) summaryResults.value = String(cached.nResults);
+    return true;
+  }
+
   function resetSummary() {
     if (!summaryOutput) return;
     summaryOutput.innerHTML = '<p class="empty">Generate a focused summary for the selected chat.</p>';
@@ -832,6 +872,15 @@ import { renderMarkdown } from '../utils/markdown';
       renderFlashcards(data.flashcards || []);
       if (flashcardTopicCount) flashcardTopicCount.textContent = String(data.total_topics || 0);
       if (flashcardCount) flashcardCount.textContent = String(data.total_flashcards || 0);
+      if (selectedChatId) {
+        writeChatCache('flashcards', selectedChatId, {
+          cards: data.flashcards || [],
+          totalTopics: data.total_topics || 0,
+          totalFlashcards: data.total_flashcards || 0,
+          nResults,
+          updatedAt: new Date().toISOString(),
+        });
+      }
       setFlashcardStatus('Flashcards generated', 'success');
     } catch (err: any) {
       console.error('Flashcard error:', err);
@@ -897,6 +946,23 @@ import { renderMarkdown } from '../utils/markdown';
         if (hint) hint.textContent = flashcardExpanded.has(index) ? 'Collapse' : 'Expand';
       });
     });
+  }
+
+  function restoreFlashcardsFromCache(chatId: number) {
+    if (!flashcardOutput) return false;
+    const cached = readChatCache('flashcards', chatId);
+    if (!cached?.cards) return false;
+    renderFlashcards(cached.cards || []);
+    if (flashcardTopicCount && typeof cached.totalTopics === 'number') flashcardTopicCount.textContent = String(cached.totalTopics);
+    if (flashcardCount && typeof cached.totalFlashcards === 'number') flashcardCount.textContent = String(cached.totalFlashcards);
+    if (flashcardResults && cached.nResults) flashcardResults.value = String(cached.nResults);
+    setFlashcardStatus('Previously generated flashcards restored', 'success');
+    return true;
+  }
+
+  function restoreCachedChatArtifacts(chatId: number) {
+    restoreSummaryFromCache(chatId);
+    restoreFlashcardsFromCache(chatId);
   }
 
   function clearFlashcards() {

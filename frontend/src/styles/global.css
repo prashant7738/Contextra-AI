@@ -822,7 +822,7 @@ textarea {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1500;
+  z-index: 1700;
 }
 .modal-backdrop[open] {
   display: flex;
@@ -2158,7 +2158,7 @@ textarea {
     top: 68px;
     bottom: auto;
     max-height: calc(100vh - 84px);
-    z-index: 1590;
+    z-index: 1600;
     background: var(--color-surface-overlay);
     border: 1px solid var(--line);
     border-radius: 22px;
