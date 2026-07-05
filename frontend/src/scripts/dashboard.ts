@@ -14,6 +14,7 @@
  */
 import { apiFetch } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
+import { buildSummaryRestoreState } from '../utils/summary-history';
 
 (function bootDashboard() {
   let user: any = null;
@@ -748,7 +749,8 @@ import { renderMarkdown } from '../utils/markdown';
 
   async function generateSummary(ev: Event) {
     ev.preventDefault();
-    if (!selectedChatId) {
+    const targetChatId = selectedChatId;
+    if (!targetChatId) {
       setStatus('Select a chat before generating summary', 'warning');
       return;
     }
@@ -764,7 +766,7 @@ import { renderMarkdown } from '../utils/markdown';
       const startResp = await apiFetch(`/chats/summary-task?user_id=${user.id}`, {
         method: 'POST',
         body: JSON.stringify({
-          chat_id: selectedChatId,
+          chat_id: targetChatId,
           topic_name: topic,
           n_results: nResults,
           max_tokens: 900,
@@ -790,14 +792,14 @@ import { renderMarkdown } from '../utils/markdown';
             nResults,
             updatedAt: new Date().toISOString(),
           };
-          if (selectedChatId) {
-            // Always keep the newest as the single-item cache (for backward compat restore)
-            writeChatCache('summary', selectedChatId, entry);
-            // Also append to the history list so old summaries are preserved
-            appendSummaryHistory(selectedChatId, entry);
+          if (targetChatId) {
+            // Keep the newest as the single-item cache and preserve the full chat history.
+            writeChatCache('summary', targetChatId, entry);
+            appendSummaryHistory(targetChatId, entry);
+            if (selectedChatId === targetChatId) {
+              restoreSummaryFromCache(targetChatId);
+            }
           }
-          renderSummary(taskResp.result);
-          if (selectedChatId) renderSummaryHistory(selectedChatId);
           return;
         }
         if (taskResp.status === 'error') {
@@ -862,26 +864,21 @@ import { renderMarkdown } from '../utils/markdown';
 
   /**
    * Renders the summary history list into #summary-history-list.
-   * Each entry in history (newest first) becomes a collapsible item.
-   * The first entry (index 0) is the current/active one so we skip it in the sidebar
-   * and start from index 1 (previous summaries).
+   * The entries passed in are already normalized to exclude the current item.
    */
-  function renderSummaryHistory(chatId: number) {
+  function renderSummaryHistory(entries: any[]) {
     const historyPanel = document.getElementById('summary-history-panel');
     const historyList = document.getElementById('summary-history-list');
     if (!historyPanel || !historyList) return;
 
-    const history = readSummaryHistory(chatId);
-    // history[0] is the current summary already shown above; show from index 1
-    const previous = history.slice(1);
-
-    if (previous.length === 0) {
+    if (entries.length === 0) {
       historyPanel.hidden = true;
+      historyList.innerHTML = '';
       return;
     }
 
     historyPanel.hidden = false;
-    historyList.innerHTML = previous
+    historyList.innerHTML = entries
       .map((entry: any, idx: number) => {
         const d = entry.data || {};
         const entryTitle = escapeHtml(d.title || d.topic || entry.topic || 'Summary');
@@ -937,11 +934,13 @@ import { renderMarkdown } from '../utils/markdown';
   function restoreSummaryFromCache(chatId: number) {
     if (!summaryOutput) return false;
     const cached = readChatCache('summary', chatId);
-    if (!cached?.data) return false;
-    renderSummary(cached.data);
-    if (summaryTopic && cached.topic) summaryTopic.value = cached.topic;
-    if (summaryResults && cached.nResults) summaryResults.value = String(cached.nResults);
-    renderSummaryHistory(chatId);
+    const history = readSummaryHistory(chatId);
+    const { current, previous } = buildSummaryRestoreState(cached, history);
+    if (!current?.data) return false;
+    renderSummary(current.data);
+    if (summaryTopic && current.topic) summaryTopic.value = current.topic;
+    if (summaryResults && current.nResults) summaryResults.value = String(current.nResults);
+    renderSummaryHistory(previous);
     return true;
   }
 
