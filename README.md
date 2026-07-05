@@ -2,7 +2,7 @@
 
 **Your documents, supercharged. Chat, summarize, and memorize — like a second brain that actually works.**
 
-Stop drowning in PDFs. Contextra AI ingests your documents and turns them into an interactive knowledge base you can talk to. Ask questions, get 80/20 summaries, generate flashcards — all grounded in your own files.
+Stop drowning in PDFs. Contextra AI ingests your documents and turns them into an interactive knowledge base you can talk to. Ask questions, get 80/20 summaries(Pareto Principle), generate flashcards — all grounded in your own files.
 
 ---
 

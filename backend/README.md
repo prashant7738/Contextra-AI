@@ -1,29 +1,36 @@
 # Contextra AI Backend
-## User Management
 
-Public `/users` management endpoints have been removed. User creation and authentication continue to be handled by the `/auth` routes (login/refresh/me). Administrators can manage and inspect users via the admin endpoints:
+## Environment Variables
 
-- `GET /admin/users` — list all users (admin-only)
-- `GET /admin/users/{user_id}/chats` — list a user's chats (admin-only)
-- `GET /admin/chats/{chat_id}/messages` — view messages for a chat (admin-only)
+Configure via `.env` file:
 
-Configure the admin account email using the `ADMIN_EMAIL` environment variable (see Environment Variables above).
-**Response:**
-```json
-{
-  "message": "Hello from Second Brain AI",
-  "step": 2
-}
-```
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string (e.g. `postgresql+psycopg2://user:pass@localhost:5432/contextra`) |
+| `HF_TOKEN` | Yes | — | Hugging Face API token for LLM & embeddings |
+| `SECRET_KEY` | Yes | — | JWT signing secret |
+| `ADMIN_EMAIL` | No | — | Email of the admin user (admin endpoints require this) |
+| `CRON_SECRET` | No | — | Secret for `/cron/run` endpoint |
+| `CORS_ORIGINS` | No | `http://localhost:3000,http://localhost:4321,https://contextra-ai.vercel.app` | Comma-separated allowed CORS origins |
+| `ALGORITHM` | No | `HS256` | JWT algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | Access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Refresh token lifetime |
+| `EMBEDDING_PROVIDER` | No | `local` | Embedding provider: `local`, `openai`, or `huggingface` |
+| `OPENAI_API_KEY` | No | — | Required if `EMBEDDING_PROVIDER=openai` |
+| `SUPABASE_URL` | No | — | Supabase Storage URL (optional) |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | — | Supabase Storage service role key |
+| `SUPABASE_STORAGE_BUCKET` | No | `documents` | Supabase Storage bucket name |
+| `DEFAULT_USER_TOKEN_LIMIT` | No | `25000` | Default monthly token budget per user |
 
 ---
 
 ## Authentication Endpoints
 
-### 2. Register User
+All auth endpoints are prefixed with `/auth`.
 
-#### POST `/auth/register`
+### POST `/auth/register`
 Register a user with name, email, and password.
+
 ```bash
 curl -X POST "http://localhost:8000/auth/register" \
   -H "Content-Type: application/json" \
@@ -43,16 +50,16 @@ curl -X POST "http://localhost:8000/auth/register" \
   "user": {
     "id": 1,
     "name": "John Doe",
-    "email": "john@example.com"
+    "email": "john@example.com",
+    "token_limit": 25000,
+    "tokens_used": 0
   }
 }
 ```
 
 ---
 
-### 3. Login
-
-#### POST `/auth/login`
+### POST `/auth/login`
 Login with email and password.
 
 ```bash
@@ -66,9 +73,7 @@ curl -X POST "http://localhost:8000/auth/login" \
 
 ---
 
-### 4. Refresh Access Token
-
-#### POST `/auth/refresh`
+### POST `/auth/refresh`
 Get a new access token using a refresh token.
 
 ```bash
@@ -81,9 +86,7 @@ curl -X POST "http://localhost:8000/auth/refresh" \
 
 ---
 
-### 5. Get Current User
-
-#### GET `/auth/me`
+### GET `/auth/me`
 Get currently authenticated user details.
 
 ```bash
@@ -93,115 +96,41 @@ curl "http://localhost:8000/auth/me" \
 
 ---
 
-## User Management Endpoints
+## Admin Endpoints
 
-### 6. Create User
+Admin endpoints are prefixed with `/admin`. All require authentication and the user's email must match the `ADMIN_EMAIL` env var.
 
-#### POST `/users/`
-Create a new user.
+### GET `/admin/users`
+List all users (admin-only).
+
+### PATCH `/admin/users/{user_id}/token-limit`
+Update a user's monthly token limit.
 
 ```bash
-curl -X POST "http://localhost:8000/users/" \
+curl -X PATCH "http://localhost:8000/admin/users/1/token-limit" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
-  -d '{"name": "John Doe"}'
+  -d '{"token_limit": 50000}'
 ```
 
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "John Doe"
-}
-```
+### GET `/admin/users/{user_id}/chats`
+List all chats for a specific user.
 
----
-
-### 7. List All Users
-
-#### GET `/users/`
-Get all users with pagination.
-
-```bash
-curl "http://localhost:8000/users/?skip=0&limit=100"
-```
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "name": "John Doe"
-  },
-  {
-    "id": 2,
-    "name": "Jane Smith"
-  }
-]
-```
-
----
-
-### 8. Get Specific User
-
-#### GET `/users/{user_id}`
-Get user details by ID.
-
-```bash
-curl "http://localhost:8000/users/1"
-```
-
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "John Doe"
-}
-```
-
----
-
-### 9. Delete User
-
-#### DELETE `/users/{user_id}`
-Delete a user by ID.
-
-```bash
-curl -X DELETE "http://localhost:8000/users/1"
-```
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
+### GET `/admin/chats/{chat_id}/messages`
+View all messages for a chat (bypasses ownership).
 
 ---
 
 ## Chat Management Endpoints
 
-### 10. Get Chat Messages
+All chat endpoints are prefixed with `/chats` and require authentication.
 
-#### GET `/chats/{chat_id}/messages`
-Get recent conversation history for a chat.
-
-```bash
-curl "http://localhost:8000/chats/1/messages?user_id=1&limit=50"
-```
-
-**Parameters:**
-- `user_id` (query): ID of the chat owner
-- `limit` (query, optional): Number of recent messages to return (1-200, default: 50)
-
----
-
-### 11. Create Chat
-
-#### POST `/chats/`
+### POST `/chats/`
 Create a new chat for a user.
 
 ```bash
 curl -X POST "http://localhost:8000/chats/?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{"name": "Document Analysis"}'
 ```
@@ -210,6 +139,7 @@ curl -X POST "http://localhost:8000/chats/?user_id=1" \
 ```json
 {
   "id": 1,
+  "local_id": 1,
   "user_id": 1,
   "name": "Document Analysis",
   "created_at": "2026-05-26T12:00:00",
@@ -217,124 +147,60 @@ curl -X POST "http://localhost:8000/chats/?user_id=1" \
 }
 ```
 
----
-
-### 12. List User's Chats
-
-#### GET `/chats/`
-Get all chats for a specific user.
+### GET `/chats/`
+List all chats for a user.
 
 ```bash
-curl "http://localhost:8000/chats/?user_id=1"
+curl "http://localhost:8000/chats/?user_id=1" \
+  -H "Authorization: Bearer your_token"
 ```
 
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "user_id": 1,
-    "name": "Document Analysis",
-    "created_at": "2026-05-26T12:00:00",
-    "updated_at": "2026-05-26T12:00:00"
-  },
-  {
-    "id": 2,
-    "user_id": 1,
-    "name": "Research Chat",
-    "created_at": "2026-05-26T12:05:00",
-    "updated_at": "2026-05-26T12:05:00"
-  }
-]
-```
-
----
-
-### 13. Get Specific Chat
-
-#### GET `/chats/{chat_id}`
+### GET `/chats/{chat_id}`
 Get a specific chat (verifies ownership).
 
 ```bash
-curl "http://localhost:8000/chats/1?user_id=1"
+curl "http://localhost:8000/chats/1?user_id=1" \
+  -H "Authorization: Bearer your_token"
 ```
 
-**Response:**
-```json
-{
-  "id": 1,
-  "user_id": 1,
-  "name": "Document Analysis",
-  "created_at": "2026-05-26T12:00:00",
-  "updated_at": "2026-05-26T12:00:00"
-}
+### PATCH `/chats/{chat_id}`
+Update a chat's name (verifies ownership).
+
+```bash
+curl -X PATCH "http://localhost:8000/chats/1?user_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Name"}'
 ```
 
----
-
-### 14. Delete Chat
-
-#### DELETE `/chats/{chat_id}`
+### DELETE `/chats/{chat_id}`
 Delete a chat (verifies ownership).
 
 ```bash
-curl -X DELETE "http://localhost:8000/chats/1?user_id=1"
+curl -X DELETE "http://localhost:8000/chats/1?user_id=1" \
+  -H "Authorization: Bearer your_token"
 ```
 
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
----
-
-## Document Management Endpoints
-
-### 15. Upload Document to Chat
-
-#### POST `/documents/ingest`
-Upload and ingest a PDF document into a specific chat.
+### GET `/chats/{chat_id}/messages`
+Get recent conversation history for a chat.
 
 ```bash
-curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "files=@document.pdf"
+curl "http://localhost:8000/chats/1/messages?user_id=1&limit=50" \
+  -H "Authorization: Bearer your_token"
 ```
 
 **Parameters:**
-- `user_id` (query): ID of the user uploading the document
-- `chat_id` (query): ID of the chat to attach the document to
-- `files` (form-data): PDF file(s) to upload (repeat field for multiple files)
-
-**Response:**
-```json
-{
-  "chunks_count": 25,
-  "status": "embedded and stored",
-  "document_id": 1,
-  "chat_id": 1
-}
-```
-
-**Notes:**
-- Extracts text from PDF
-- Chunks text into smaller pieces
-- Creates embeddings for each chunk
-- Stores chunks in both PostgreSQL and ChromaDB
-- Only documents uploaded to a chat are searchable in that chat
+- `user_id` (query): ID of the chat owner
+- `limit` (query, optional): Number of recent messages to return (1-200, default: 50)
 
 ---
 
-## Chat Query Endpoint
-
-### 16. Query Within Chat
-
-#### POST `/chats/query`
+### POST `/chats/query`
 Ask a question within a specific chat context.
 
 ```bash
 curl -X POST "http://localhost:8000/chats/query?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{
     "chat_id": 1,
@@ -342,93 +208,155 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
   }'
 ```
 
-**Parameters:**
-- `user_id` (query): ID of the user asking the query
-- `chat_id` (body): ID of the chat to search within
-- `request` (body): The question to ask
-
 **Response:**
 ```json
 {
-  "answer": "Based on the documents in this chat, the main topic is... [AI-generated answer]"
-}
-```
-
-**How it works:**
-1. Verifies chat ownership (user can only query their own chats)
-2. Embeds the question using the same model as the chunks
-3. Finds top-3 similar chunks from the chat
-4. Passes the context to Llama 3.1 8B
-5. Returns the generated answer
-
----
-
-### 17. Generate Detailed Study Summary
-
-#### POST `/chats/detailed-summarizer`
-Generate a detailed study summary using the 80/20 rule from uploaded documents in a chat.
-
-```bash
-curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "chat_id": 1,
-    "topic_name": "Machine Learning",
-    "n_results": 5,
-    "max_tokens": 2000
-  }'
-```
-
-**Parameters:**
-- `user_id` (query): ID of the user requesting the summary
-- `chat_id` (body): ID of the chat to summarize
-- `topic_name` (body): Topic to summarize (use "all" or leave empty for full context summary)
-- `n_results` (body): Number of relevant chunks to retrieve (optional)
-- `max_tokens` (body): Maximum tokens for the response (optional)
-
-**Response:**
-```json
-{
-  "summary": "Machine Learning is a subset of AI that enables systems to learn and improve from experience... [Detailed 80/20 summary]",
-  "topic": "Machine Learning",
+  "answer": "Based on the documents in this chat, the main topic is... [AI-generated answer]",
   "references": [
     {
-      "page": 1,
-      "document_id": 1,
-      "document_name": "ai_book.pdf"
+      "filename": "doc.pdf",
+      "page": 3,
+      "document_id": 1
     }
   ],
-  "chunks_used": 15
+  "conversation_history": [
+    {
+      "id": 1,
+      "chat_id": 1,
+      "user_message": "What is the main topic?",
+      "bot_response": "The main topic is...",
+      "created_at": "2026-05-26T12:00:00"
+    }
+  ]
 }
 ```
 
 **How it works:**
 1. Verifies chat ownership
-2. If topic is specific, first retrieves LLM-enriched context via query
-3. Generates a concise summary following the 80/20 Pareto principle (80% value in 20% content)
-4. Includes references to source documents and chunks used
+2. Embeds the question
+3. Finds top-10 similar chunks from the chat
+4. Includes previous conversation context (last 10 messages)
+5. Passes context to Llama 3.1 8B
+6. Saves message & response to history
+7. Returns answer, references, and conversation history
+8. Deducts tokens from user's monthly budget
 
 ---
 
-### 18. Generate Flashcards
-
-#### POST `/chats/flashcard`
-Generate intelligent flashcards from all uploaded documents in a chat.
+### POST `/chats/detailed-summarizer`
+Generate a detailed study summary using the 80/20 rule from uploaded documents in a chat.
 
 ```bash
-curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
+curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{
+    "chat_id": 1,
+    "topic_name": "Machine Learning",
     "n_results": 5,
-    "max_tokens": 1000
+    "max_tokens": 700
   }'
 ```
 
 **Parameters:**
-- `user_id` (query): ID of the user requesting flashcards
-- `chat_id` (query): ID of the chat to generate flashcards from
-- `n_results` (body, optional): Number of relevant chunks to retrieve for generation (default: 5)
-- `max_tokens` (body, optional): Maximum tokens for generation (default: 1000)
+- `user_id` (query): ID of the user
+- `chat_id` (body): ID of the chat to summarize
+- `topic_name` (body, default: `"all"`): Topic to summarize; use `"all"` for full context
+- `n_results` (body, optional, default: 5, range: 3-40): Number of relevant chunks
+- `max_tokens` (body, optional, default: 700, range: 200-1200): Max tokens for response
+
+**Response:**
+```json
+{
+  "summary": "... [detailed 80/20 summary text]",
+  "topic": "Machine Learning",
+  "references": [
+    {
+      "filename": "ai_book.pdf",
+      "page": 1,
+      "document_id": 1
+    }
+  ],
+  "chunks_used": 15,
+  "title": "Machine Learning Fundamentals",
+  "sections": [
+    {
+      "heading": "Core Concepts",
+      "items": [
+        "ML is a subset of AI that enables systems to learn from data...",
+        "Supervised learning uses labeled training data..."
+      ]
+    },
+    {
+      "heading": "Must Remember",
+      "items": [
+        "Bias-variance tradeoff is key to model performance",
+        "Overfitting occurs when model memorizes noise"
+      ]
+    },
+    {
+      "heading": "Quick Revision Checklist",
+      "items": [
+        "Understand difference between supervised/unsupervised/reinforcement learning",
+        "Know key evaluation metrics (accuracy, precision, recall, F1)"
+      ]
+    }
+  ]
+}
+```
+
+### POST `/chats/summary-task`
+Create an asynchronous summary task (non-blocking alternative to `/chats/detailed-summarizer`).
+
+```bash
+curl -X POST "http://localhost:8000/chats/summary-task?user_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": 1, "topic_name": "Machine Learning"}'
+```
+
+**Response:** `{"task_id": "uuid-string"}`
+
+### GET `/chats/summary-task/{task_id}`
+Get the status and result of an async summary task.
+
+```bash
+curl "http://localhost:8000/chats/summary-task/uuid-string" \
+  -H "Authorization: Bearer your_token"
+```
+
+**Response (pending):**
+```json
+{"task_id": "uuid-string", "status": "pending", "result": null, "error": null}
+```
+
+**Response (done):**
+```json
+{
+  "task_id": "uuid-string",
+  "status": "done",
+  "result": { "summary": "...", "topic": "all", "references": [], "chunks_used": 10, "title": "...", "sections": [] },
+  "error": null
+}
+```
+
+---
+
+### POST `/chats/flashcard`
+Generate intelligent flashcards from all uploaded documents in a chat.
+
+```bash
+curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{"n_results": 5, "max_tokens": 1000}'
+```
+
+**Parameters:**
+- `user_id` (query): ID of the user
+- `chat_id` (query): ID of the chat
+- `n_results` (body, optional, default: 5, range: 3-40): Number of relevant chunks
+- `max_tokens` (body, optional, default: 1000, range: 500-2000): Max tokens for generation
 
 **Response:**
 ```json
@@ -437,20 +365,10 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
     {
       "topic": "Machine Learning Basics",
       "summary": "ML is a subset of AI that enables systems to learn from data",
-      "explanation": "Machine Learning is a branch of Artificial Intelligence that focuses on enabling computer systems to automatically learn and improve from experience without being explicitly programmed. It uses algorithms to find patterns in data and make predictions or decisions based on those patterns.",
+      "explanation": "Machine Learning is a branch of Artificial Intelligence...",
       "references": [
-        {
-          "page": 5,
-          "document_id": 1,
-          "document_name": "ai_book.pdf"
-        }
+        { "filename": "ai_book.pdf", "page": 5, "document_id": 1 }
       ]
-    },
-    {
-      "topic": "Neural Networks",
-      "summary": "Neural networks mimic biological neurons to process information",
-      "explanation": "...",
-      "references": [...]
     }
   ],
   "total_topics": 8,
@@ -459,60 +377,199 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 ```
 
 **Flashcard Generation Features:**
-- **Smart Distribution**: Automatically creates more flashcards for important topics (8-12), medium topics (4-7), and basic topics (2-3)
-- **Comprehensive Content**: Each flashcard includes topic name, one-line summary, and detailed explanation
+- **Smart Distribution**: Important topics get 8-12 flashcards, medium 4-7, basic 2-3
+- **Comprehensive Content**: Topic name, one-line summary, detailed explanation
 - **Source Tracking**: References to source documents for each flashcard
-- **Full Context**: Always uses ALL uploaded documents in the chat (no topic filtering)
+- **Full Context**: Always uses ALL uploaded documents in the chat
+
+---
+
+## Document Management Endpoints
+
+All document endpoints are prefixed with `/documents` and require authentication.
+
+### GET `/documents/`
+List all documents for a specific chat.
+
+```bash
+curl "http://localhost:8000/documents/?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token"
+```
+
+**Response:**
+```json
+[
+  { "id": 1, "chat_id": 1, "filename": "ai_book.pdf" }
+]
+```
+
+### POST `/documents/ingest/direct`
+Upload a PDF directly (file body).
+
+```bash
+curl -X POST "http://localhost:8000/documents/ingest/direct?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -F "file=@document.pdf"
+```
+
+**Parameters:**
+- `user_id` (query): ID of the user
+- `chat_id` (query): ID of the chat
+- `use_ocr` (query, optional, default: `false`): Enable OCR for scanned PDFs
+- `file` or `files` (form-data): PDF file(s)
+
+**Response:**
+```json
+{
+  "task_id": 1,
+  "status": "pending"
+}
+```
+
+### POST `/documents/ingest/presign`
+Get a presigned upload URL for client-side upload (used with Supabase Storage).
+
+```bash
+curl -X POST "http://localhost:8000/documents/ingest/presign?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "document.pdf"}'
+```
+
+**Response:**
+```json
+{
+  "task_id": 1,
+  "upload_url": "https://storage.supabase.co/...",
+  "upload_method": "PUT"
+}
+```
+
+### POST `/documents/ingest/{task_id}/confirm`
+Confirm upload and trigger background ingestion.
+
+```bash
+curl -X POST "http://localhost:8000/documents/ingest/1/confirm?user_id=1" \
+  -H "Authorization: Bearer your_token"
+```
+
+### GET `/documents/ingest/status/{task_id}`
+Check the status of an ingestion task.
+
+```bash
+curl "http://localhost:8000/documents/ingest/status/1?user_id=1" \
+  -H "Authorization: Bearer your_token"
+```
+
+**Response:**
+```json
+{
+  "task_id": 1,
+  "status": "completed",
+  "chunks_count": 25,
+  "error_message": null,
+  "created_at": "2026-05-26T12:00:00",
+  "updated_at": "2026-05-26T12:00:05"
+}
+```
+
+**Ingestion Flow:**
+1. Upload PDF via `/ingest/direct` (direct) or `/ingest/presign` + `/ingest/{id}/confirm` (presigned)
+2. Background task processes the file:
+   - Extracts text from PDF using PyMuPDF (with optional EasyOCR fallback for scanned pages)
+   - Chunks text into smaller pieces (~300 words each)
+   - Creates embeddings for each chunk
+   - Stores chunks in pgvector (PostgreSQL + vector extension)
+3. Poll `/ingest/status/{task_id}` until `status` is `completed` or `error`
+
+---
+
+## Cron Endpoints
+
+### POST `/cron/run`
+Trigger maintenance jobs (requires `CRON_SECRET` header).
+
+```bash
+curl -X POST "http://localhost:8000/cron/run" \
+  -H "X-Cron-Secret: your_secret"
+```
+
+---
+
+## Root Endpoint
+
+### GET `/`
+Health check.
+
+```bash
+curl "http://localhost:8000/"
+```
+
+**Response:**
+```json
+{
+  "message": "Hello from Second Brain AI",
+  "step": 2
+}
+```
 
 ---
 
 ## Complete Workflow Example
 
-### Step 1: Create User
+### Step 1: Register / Login
 ```bash
-curl -X POST "http://localhost:8000/users/" \
+curl -X POST "http://localhost:8000/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Alice"}'
-# Response: {"id": 1, "name": "Alice"}
+  -d '{"name": "Alice", "email": "alice@example.com", "password": "SecurePass1!"}'
+# Save the access_token from response
 ```
 
 ### Step 2: Create Chat
 ```bash
 curl -X POST "http://localhost:8000/chats/?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{"name": "AI Research"}'
-# Response: {"id": 1, "user_id": 1, "name": "AI Research", ...}
 ```
 
 ### Step 3: Upload Document
 ```bash
-curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "files=@ai_research.pdf"
-# Response: {"chunks_count": 42, "status": "embedded and stored", "document_id": 1, "chat_id": 1}
+curl -X POST "http://localhost:8000/documents/ingest/direct?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token" \
+  -F "file=@ai_research.pdf"
+# Response: {"task_id": 1, "status": "pending"}
 ```
 
-### Step 4: Query the Chat
+### Step 4: Wait for Ingestion
+```bash
+curl "http://localhost:8000/documents/ingest/status/1?user_id=1" \
+  -H "Authorization: Bearer your_token"
+# Repeat until status is "completed"
+```
+
+### Step 5: Query the Chat
 ```bash
 curl -X POST "http://localhost:8000/chats/query?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{"chat_id": 1, "request": "What are the key findings?"}'
-# Response: {"answer": "Based on the document, the key findings are..."}
 ```
 
-### Step 5: Generate Detailed Summary (Optional)
+### Step 6: Generate Summary (Optional)
 ```bash
 curl -X POST "http://localhost:8000/chats/detailed-summarizer?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
-  -d '{"chat_id": 1, "topic_name": "AI Research", "n_results": 5, "max_tokens": 2000}'
-# Response: {"summary": "AI Research is...", "topic": "AI Research", "references": [...], "chunks_used": 15}
+  -d '{"chat_id": 1, "topic_name": "AI Research"}'
 ```
 
-### Step 6: Generate Flashcards (Optional)
+### Step 7: Generate Flashcards (Optional)
 ```bash
 curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
-  -d '{"n_results": 5, "max_tokens": 1000}'
-# Response: {"flashcards": [...], "total_topics": 8, "total_flashcards": 32}
+  -d '{}'
 ```
 
 ---
@@ -522,31 +579,49 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 ### Data Flow
 
 ```
-1. PDF Upload
-   └─> Extract text → Chunk text → Embed chunks → Store (DB + Vector DB)
+1. PDF Upload (Direct or Presigned)
+   └─> Background task → Extract text (PyMuPDF + optional OCR) 
+       → Chunk text (~300 words) → Embed chunks (384-dim) 
+       → Store in pgvector (PostgreSQL)
 
 2. Query & Chat
-   └─> Embed query → Find similar chunks (Top-K) → Pass to LLM with history → Return answer + references
+   └─> Embed question → Find top-10 similar chunks (pgvector cosine search)
+       → Include last 10 messages as conversation context
+       → Pass to Llama 3.1 8B → Return answer + references + history
+       → Deduct tokens from user's monthly budget
 
-3. Detailed Summarization
-   └─> Retrieve topic-specific context → Generate 80/20 summary → Return with references
+3. Detailed Summarization (80/20)
+   └─> If specific topic → first answer_query for LLM-enriched context
+       → Retrieve relevant chunks → Generate structured JSON summary
+       → Return with title, sections (Core Concepts / Must Remember / Checklist), references
 
 4. Flashcard Generation
-   └─> Retrieve all context → Intelligent topic extraction → Generate flashcards with explanations → Return organized set
+   └─> Retrieve all context → LLM generates flashcards in structured format
+       → Parse output → Return organized set with topic distribution
 
-5. Isolation
-   └─> Each chat scoped by chat_id → User can only access their chats → All operations verify ownership
+5. Async Tasks
+   └─> Summary tasks run in background thread with DB status tracking
+       → Poll /summary-task/{id} for completion
+
+6. Isolation
+   └─> All operations verify user_id matches current_user.id from JWT
+       → Admin endpoints gated by ADMIN_EMAIL match
 ```
 
 ### Technology Stack
 
-- **Framework**: FastAPI
-- **Database**: PostgreSQL
-- **Vector Store**: ChromaDB (development), pgvector (production-ready)
-- **Embeddings**: BAAI/bge-base-en-v1.5 (via HuggingFace)
-- **LLM**: meta-llama/Llama-3.1-8B-Instruct (via HuggingFace)
+- **Framework**: FastAPI (Python 3.12+)
+- **Database**: PostgreSQL + pgvector (vector extension)
+- **Embedding Model**: BAAI/bge-small-en-v1.5 (384-dim, local via sentence-transformers)
+- **Embedding Providers**: local (default), OpenAI (text-embedding-3-small), HuggingFace Inference API
+- **LLM**: meta-llama/Llama-3.1-8B-Instruct (via HuggingFace Inference API)
+- **PDF Extraction**: PyMuPDF (text) + EasyOCR (scanned page fallback)
 - **ORM**: SQLAlchemy 2.0
 - **Migrations**: Alembic
+- **Auth**: JWT (python-jose) with access + refresh tokens
+- **Password Hashing**: bcrypt (via passlib)
+- **Storage**: Local temp files or Supabase Storage (optional)
+- **Token Budget**: Monthly per-user token tracking
 
 ---
 
@@ -554,34 +629,60 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 
 ### Common Errors
 
+**403 Forbidden - User mismatch:**
+```bash
+curl "http://localhost:8000/chats/999?user_id=1" \
+  -H "Authorization: Bearer your_token"
+# Response: {"detail": "Forbidden: user mismatch"}
+```
+
 **404 Not Found - Chat doesn't belong to user:**
 ```bash
-curl "http://localhost:8000/chats/999?user_id=1"
+curl "http://localhost:8000/chats/999?user_id=1" \
+  -H "Authorization: Bearer your_token"
 # Response: {"detail": "Chat not found or doesn't belong to you"}
 ```
 
-**400 Bad Request - Missing required field:**
+**422 Validation Error - Missing required field:**
 ```bash
 curl -X POST "http://localhost:8000/chats/?user_id=1" \
+  -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
   -d '{}'
 # Response: {"detail": [{"loc": ["body", "name"], "msg": "field required", ...}]}
 ```
 
-**500 Internal Server Error - PDF processing failed:**
+**500 Error - Processing failed:**
 ```bash
-curl -X POST "http://localhost:8000/documents/ingest?user_id=1&chat_id=1" \
-  -F "files=@invalid_file.txt"
-# Response: {"detail": "Error processing PDF: ..."}
+# Response: {"detail": "Error processing query: ..."}
 ```
 
 ---
 
 ## Development
 
-### Clear Database
+### Setup
 
-To start fresh (deletes all users, documents, chats, vectors):
+```bash
+# Create virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install dependencies
+uv sync
+
+# Copy env file
+cp .env.example .env
+# Edit .env with your database URL and HF token
+
+# Run database migrations
+uv run alembic upgrade head
+
+# Start server
+uv run uvicorn app.main:app --reload
+```
+
+### Clear Database
 
 ```bash
 uv run python3 << 'EOF'
@@ -590,8 +691,6 @@ Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 print("✓ Database cleared")
 EOF
-
-rm -rf my_vector_db/
 ```
 
 ### Run Tests
@@ -617,14 +716,15 @@ uv run alembic downgrade -1
 
 ## Production Considerations
 
-- Replace ChromaDB with production vector DB (Qdrant, Milvus, or Pinecone)
-- Add authentication/authorization
+- Replace local embeddings with OpenAI or HuggingFace Inference API
+- Use a connection pooler (e.g. PgBouncer) for PostgreSQL
 - Implement rate limiting
-- Add comprehensive logging
+- Add comprehensive logging (structured logging)
 - Use HTTPS
 - Deploy with Docker/Kubernetes
 - Set up proper backups for PostgreSQL
-- Monitor performance and vector search latency
+- Monitor vector search latency and token usage
+- Configure Supabase Storage or S3 for file persistence
 
 ---
 
@@ -633,10 +733,10 @@ uv run alembic downgrade -1
 ### HuggingFace Token Issues
 ```bash
 # Set your token
-export HUGGINGFACE_API_KEY=your_token_here
+export HF_TOKEN=your_token_here
 
 # Or add to .env file
-HUGGINGFACE_API_KEY=your_token_here
+HF_TOKEN=your_token_here
 ```
 
 ### PostgreSQL Connection Failed
@@ -645,15 +745,22 @@ HUGGINGFACE_API_KEY=your_token_here
 psql -U postgres -c "SELECT 1;"
 
 # Verify connection string in .env
-DATABASE_URL=postgresql://user:password@localhost:5432/contextra_ai_db
+DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/contextra
+
+# Ensure pgvector extension is installed
+psql -U postgres -d contextra -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-### Out of Memory with ChromaDB
+### Embedding Provider Issues
 ```bash
-# Clear ChromaDB
-rm -rf my_vector_db/
-
-# Recreate on next run
+# Check configured provider
+EMBEDDING_PROVIDER=local  # Uses sentence-transformers locally (no API key needed)
+# For HuggingFace API:
+EMBEDDING_PROVIDER=huggingface
+HF_TOKEN=your_token_here
+# For OpenAI:
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=your_key_here
 ```
 
 ---
@@ -663,7 +770,7 @@ rm -rf my_vector_db/
 - [ ] Support for more file formats (docx, txt, images with OCR)
 - [ ] Hybrid search (BM25 + semantic)
 - [ ] Document metadata editing
-- [ ] Chat history/export
+- [ ] Chat history export
 - [ ] Streaming responses
 - [ ] Multi-language support
 - [ ] Fine-tuned embedding models per domain

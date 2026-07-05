@@ -431,6 +431,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const mobileHamburger = document.getElementById('mobile-hamburger');
   const mobileOverlay = document.getElementById('mobile-overlay');
   const mobileHamburgerClose = document.getElementById('mobile-hamburger-close');
+  const overlayChatBtn = document.getElementById('overlay-chat');
   const overlaySummBtn = document.getElementById('overlay-summarizer');
   const overlayFlashBtn = document.getElementById('overlay-flashcard');
   const overlayLogoutBtn = document.getElementById('overlay-logout');
@@ -467,6 +468,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     document.addEventListener('keydown', (ev: KeyboardEvent) => { if (ev.key === 'Escape') closeMobileOverlay(); });
   }
 
+  overlayChatBtn?.addEventListener('click', () => { (navChatBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlaySummBtn?.addEventListener('click', () => { (summarizerBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlayFlashBtn?.addEventListener('click', () => { (flashcardBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlayLogoutBtn?.addEventListener('click', () => { (logoutBtn as HTMLElement | null)?.click(); });
@@ -1331,6 +1333,8 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const summaryClose = document.getElementById('summary-close');
   const flashcardClose = document.getElementById('flashcard-close');
 
+  const mobileOverlayChats = document.querySelector('.mobile-overlay-chats') as HTMLElement | null;
+
   function showSummaryPanel() {
     if (!summaryPanel) return;
     if (messageStream) messageStream.style.display = 'none';
@@ -1339,6 +1343,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     currentView = 'summarizer';
     updateNavActive();
     setComposerMode('upload');
+    if (mobileOverlayChats) mobileOverlayChats.style.display = 'none';
   }
 
   function showFlashcardPanel() {
@@ -1349,6 +1354,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     currentView = 'flashcard';
     updateNavActive();
     setComposerMode('upload');
+    if (mobileOverlayChats) mobileOverlayChats.style.display = 'none';
   }
 
   function closePanels() {
@@ -1358,6 +1364,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     currentView = 'chat';
     updateNavActive();
     setComposerMode('chat');
+    if (mobileOverlayChats) mobileOverlayChats.style.display = '';
   }
 
   function setComposerMode(mode: string) {
