@@ -1722,6 +1722,7 @@ textarea {
   color: inherit;
   text-align: left;
   padding: 18px;
+  cursor: pointer;
 }
 
 .flashcard-topline {

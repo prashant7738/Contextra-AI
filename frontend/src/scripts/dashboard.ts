@@ -1022,14 +1022,14 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
 
             return `
               <article class="flashcard-card" data-card-index="${index}">
-                <button class="flashcard-summary" type="button" data-toggle-index="${index}">
+                <div class="flashcard-summary" role="button" tabindex="0" data-toggle-index="${index}">
                   <div class="flashcard-topline">
                     <strong class="flashcard-topic">${escapeHtml(card.topic || 'Topic')}</strong>
                     <span class="flashcard-badge">Card ${index + 1}</span>
                   </div>
                   <p class="flashcard-summary-text">${escapeHtml(card.summary || '')}</p>
                   <span class="flashcard-hint">Expand</span>
-                </button>
+                </div>
                 <div class="flashcard-details">
                   <div class="flashcard-details-inner">
                     <p class="flashcard-explanation">${escapeHtml(card.explanation || 'No explanation')}</p>
@@ -1044,7 +1044,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     `;
 
     flashcardOutput.querySelectorAll('[data-toggle-index]').forEach((btn: any) => {
-      btn.addEventListener('click', () => {
+      const toggle = () => {
         const index = Number(btn.dataset.toggleIndex);
         if (flashcardExpanded.has(index)) flashcardExpanded.delete(index);
         else flashcardExpanded.add(index);
@@ -1052,6 +1052,13 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
         if (card) card.classList.toggle('flashcard-card-open', flashcardExpanded.has(index));
         const hint = btn.querySelector('.flashcard-hint');
         if (hint) hint.textContent = flashcardExpanded.has(index) ? 'Collapse' : 'Expand';
+      };
+      btn.addEventListener('click', toggle);
+      btn.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
       });
     });
   }
