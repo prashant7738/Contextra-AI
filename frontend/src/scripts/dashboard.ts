@@ -103,6 +103,10 @@ import { renderMarkdown } from '../utils/markdown';
     return `dashboard_${kind}_cache_${user.id}_${chatId}`;
   }
 
+  function getSummaryHistoryKey(chatId: number) {
+    return `dashboard_summary_history_${user.id}_${chatId}`;
+  }
+
   function readChatCache(kind: 'summary' | 'flashcards', chatId: number) {
     try {
       const raw = localStorage.getItem(getChatCacheKey(kind, chatId));
@@ -112,9 +116,34 @@ import { renderMarkdown } from '../utils/markdown';
     }
   }
 
+  /** Returns the full list of saved summaries for this chat (newest first). */
+  function readSummaryHistory(chatId: number): any[] {
+    try {
+      const raw = localStorage.getItem(getSummaryHistoryKey(chatId));
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   function writeChatCache(kind: 'summary' | 'flashcards', chatId: number, value: any) {
     try {
       localStorage.setItem(getChatCacheKey(kind, chatId), JSON.stringify(value));
+    } catch {
+      /* ignore storage failures */
+    }
+  }
+
+  /**
+   * Appends a new summary entry to the per-chat history array (max 20 entries).
+   * The entry is prepended so index 0 is always the newest.
+   */
+  function appendSummaryHistory(chatId: number, entry: { data: any; topic: string; nResults: number; updatedAt: string }) {
+    try {
+      const history = readSummaryHistory(chatId);
+      history.unshift(entry);
+      const trimmed = history.slice(0, 20);
+      localStorage.setItem(getSummaryHistoryKey(chatId), JSON.stringify(trimmed));
     } catch {
       /* ignore storage failures */
     }
@@ -755,15 +784,20 @@ import { renderMarkdown } from '../utils/markdown';
         taskResp = await pollResp.json();
 
         if (taskResp.status === 'done') {
-          renderSummary(taskResp.result);
+          const entry = {
+            data: taskResp.result,
+            topic,
+            nResults,
+            updatedAt: new Date().toISOString(),
+          };
           if (selectedChatId) {
-            writeChatCache('summary', selectedChatId, {
-              data: taskResp.result,
-              topic,
-              nResults,
-              updatedAt: new Date().toISOString(),
-            });
+            // Always keep the newest as the single-item cache (for backward compat restore)
+            writeChatCache('summary', selectedChatId, entry);
+            // Also append to the history list so old summaries are preserved
+            appendSummaryHistory(selectedChatId, entry);
           }
+          renderSummary(taskResp.result);
+          if (selectedChatId) renderSummaryHistory(selectedChatId);
           return;
         }
         if (taskResp.status === 'error') {
@@ -826,6 +860,80 @@ import { renderMarkdown } from '../utils/markdown';
     `;
   }
 
+  /**
+   * Renders the summary history list into #summary-history-list.
+   * Each entry in history (newest first) becomes a collapsible item.
+   * The first entry (index 0) is the current/active one so we skip it in the sidebar
+   * and start from index 1 (previous summaries).
+   */
+  function renderSummaryHistory(chatId: number) {
+    const historyPanel = document.getElementById('summary-history-panel');
+    const historyList = document.getElementById('summary-history-list');
+    if (!historyPanel || !historyList) return;
+
+    const history = readSummaryHistory(chatId);
+    // history[0] is the current summary already shown above; show from index 1
+    const previous = history.slice(1);
+
+    if (previous.length === 0) {
+      historyPanel.hidden = true;
+      return;
+    }
+
+    historyPanel.hidden = false;
+    historyList.innerHTML = previous
+      .map((entry: any, idx: number) => {
+        const d = entry.data || {};
+        const entryTitle = escapeHtml(d.title || d.topic || entry.topic || 'Summary');
+        const topicPill = escapeHtml(d.topic || entry.topic || 'all');
+        const when = entry.updatedAt ? new Date(entry.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+        let bodyHtml = '';
+        if (d.sections && d.sections.length > 0) {
+          bodyHtml = d.sections
+            .map(
+              (section: any) => `
+              <div class="summary-section">
+                <h4 class="summary-section-heading">${escapeHtml(section.heading || 'Section')}</h4>
+                <ul class="summary-section-list">
+                  ${(section.items || []).map((item: string) => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+              </div>
+            `,
+            )
+            .join('');
+        } else if (d.summary) {
+          bodyHtml = `<div class="summary-md-body">${renderMarkdown(d.summary)}</div>`;
+        }
+
+        const refs = (d.references || [])
+          .map((ref: any) => `<li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>`)
+          .join('');
+
+        return `
+          <details class="summary-history-item" data-history-index="${idx}">
+            <summary class="summary-history-toggle">
+              <div class="summary-history-toggle-inner">
+                <div class="summary-history-meta">
+                  <span class="pill pill-sm">${topicPill}</span>
+                  <span class="summary-history-when">${when}</span>
+                </div>
+                <span class="summary-history-title">${entryTitle}</span>
+              </div>
+              <span class="summary-history-chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="summary-history-body">
+              <article class="summary-card summary-card-sm">
+                <div class="summary-card-body">${bodyHtml}</div>
+                ${refs ? `<details class="summary-sources"><summary class="summary-sources-toggle">References</summary><ul>${refs}</ul></details>` : ''}
+              </article>
+            </div>
+          </details>
+        `;
+      })
+      .join('');
+  }
+
   function restoreSummaryFromCache(chatId: number) {
     if (!summaryOutput) return false;
     const cached = readChatCache('summary', chatId);
@@ -833,12 +941,15 @@ import { renderMarkdown } from '../utils/markdown';
     renderSummary(cached.data);
     if (summaryTopic && cached.topic) summaryTopic.value = cached.topic;
     if (summaryResults && cached.nResults) summaryResults.value = String(cached.nResults);
+    renderSummaryHistory(chatId);
     return true;
   }
 
   function resetSummary() {
     if (!summaryOutput) return;
     summaryOutput.innerHTML = '<p class="empty">Generate a focused summary for the selected chat.</p>';
+    const historyPanel = document.getElementById('summary-history-panel');
+    if (historyPanel) historyPanel.hidden = true;
   }
 
   function setFlashcardStatus(message: string, tone?: string) {

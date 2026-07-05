@@ -140,6 +140,14 @@ import ThemeToggle from '../components/ThemeToggle.astro';
               <div id="summary-output" class="summary-output" style="margin-top:16px">
                 <p class="empty">Generate a focused summary for the selected chat.</p>
               </div>
+
+              <!-- Summary history panel (hidden until there are past summaries) -->
+              <div id="summary-history-panel" hidden style="margin-top:28px;border-top:1px solid var(--line);padding-top:20px">
+                <div class="section-head" style="margin-bottom:12px">
+                  <h4 style="font-size:0.85rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;opacity:0.6;margin:0">Previous Summaries</h4>
+                </div>
+                <div id="summary-history-list" class="summary-history-list"></div>
+              </div>
             </div>
           </div>
 
