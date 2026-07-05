@@ -456,17 +456,18 @@ button {
 
 .frame-rails {
   --left-width: 320px;
-  grid-template-columns: minmax(260px, var(--left-width)) 8px minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--left-width)) 12px minmax(0, 1fr);
   gap: 0;
 }
 
 .resize-handle {
-  width: 8px;
+  width: 12px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   cursor: col-resize;
   position: relative;
+  align-self: stretch;
 }
 
 .rail-toggle {
@@ -495,13 +496,13 @@ button {
 
 /* Collapsed states: adjust grid columns when rails are hidden */
 .frame-rails.left-collapsed {
-  grid-template-columns: 8px minmax(0, 1fr) 8px minmax(300px, var(--right-width));
+  grid-template-columns: minmax(0, 0px) 12px minmax(0, 1fr);
 }
 .frame-rails.right-collapsed {
-  grid-template-columns: minmax(260px, var(--left-width)) 8px minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--left-width)) 12px minmax(0, 1fr);
 }
 .frame-rails.left-collapsed.right-collapsed {
-  grid-template-columns: 8px minmax(0, 1fr) 8px;
+  grid-template-columns: minmax(0, 0px) 12px minmax(0, 1fr);
 }
 
 .left-rail.collapsed,
@@ -522,18 +523,17 @@ button {
 .resize-handle::before {
   content: '';
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 50%;
   width: 3px;
-  height: 72px;
-  transform: translate(-50%, -50%);
+  height: 100%;
+  transform: translateX(-50%);
   border-radius: 999px;
   background: rgba(31, 61, 54, 0.28);
   transition: background 0.18s ease, height 0.18s ease;
 }
 
 .resize-handle:hover::before {
-  height: 108px;
   background: rgba(31, 61, 54, 0.56);
 }
 
