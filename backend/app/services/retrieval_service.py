@@ -200,11 +200,19 @@ def _parse_detailed_summary_output(output: str, topic_name: str) -> tuple[str, s
     try:
         data = json.loads(cleaned)
         sections = []
+        section_index: dict[str, dict] = {}
         for section in data.get("sections", []):
             heading = str(section.get("heading", "")).strip()
             items = [str(item).strip() for item in section.get("items", []) if str(item).strip()]
             if heading and items:
-                sections.append({"heading": heading, "items": items})
+                deduped_items = _dedupe_text_list(items)
+                if heading in section_index:
+                    existing_items = section_index[heading]["items"]
+                    existing_items.extend(item for item in deduped_items if item not in existing_items)
+                else:
+                    section = {"heading": heading, "items": deduped_items}
+                    section_index[heading] = section
+                    sections.append(section)
         title = str(data.get("title", "")).strip() or f"Detailed summary: {topic_name}"
         summary = _format_detailed_summary_text(title, sections)
         return summary, title, sections
@@ -241,8 +249,48 @@ def _parse_detailed_summary_output(output: str, topic_name: str) -> tuple[str, s
             sections.append(current)
         current["items"].append(line)
 
+    sections = _dedupe_summary_sections(sections)
+
     summary = _format_detailed_summary_text(title, sections)
     return summary, title, sections
+
+
+def _dedupe_summary_sections(sections: list[dict]) -> list[dict]:
+    deduped_sections: list[dict] = []
+    section_index: dict[str, dict] = {}
+
+    for section in sections:
+        heading = str(section.get("heading", "")).strip()
+        if not heading:
+            continue
+
+        items = _dedupe_text_list([str(item).strip() for item in section.get("items", []) if str(item).strip()])
+        if heading in section_index:
+            existing_items = section_index[heading]["items"]
+            existing_items.extend(item for item in items if item not in existing_items)
+            continue
+
+        deduped_section = {"heading": heading, "items": items}
+        section_index[heading] = deduped_section
+        deduped_sections.append(deduped_section)
+
+    return deduped_sections
+
+
+def _dedupe_text_list(items: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen = set()
+    for item in items:
+        normalized = _normalize_text(item)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(item)
+    return deduped
+
+
+def _normalize_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().lower()
 
 
 def _format_detailed_summary_text(title: str, sections: list[dict]) -> str:
@@ -313,8 +361,33 @@ async def generate_flashcards(
             f"Response preview: {flashcards_output[:400]}..."
         )
 
+    cleaned_flashcards = _dedupe_flashcards(cleaned_flashcards)
+
     # Attach references
     for card in cleaned_flashcards:
         card["references"] = references
 
     return cleaned_flashcards, references
+
+
+def _dedupe_flashcards(flashcards: list[dict]) -> list[dict]:
+    deduped: list[dict] = []
+    seen = set()
+
+    for card in flashcards:
+        topic = str(card.get("topic", "")).strip()
+        summary = str(card.get("summary", "")).strip()
+        explanation = str(card.get("explanation", "")).strip()
+        key = (_normalize_text(topic), _normalize_text(summary))
+
+        if not topic or not summary or not explanation or key in seen:
+            continue
+
+        seen.add(key)
+        deduped.append({
+            "topic": topic,
+            "summary": summary,
+            "explanation": explanation,
+        })
+
+    return deduped

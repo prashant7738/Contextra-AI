@@ -622,7 +622,8 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
       if (pendingTurn) {
         const botBubble = pendingTurn.querySelector('.bubble-bot .bot-content');
         if (botBubble) {
-          botBubble.innerHTML = renderMarkdown(data.answer || '');
+          const references = renderReferenceDetails(data.references || []);
+          botBubble.innerHTML = `${renderMarkdown(data.answer || '')}${references}`;
         } else {
           console.warn('bot-content div not found, falling back to direct update');
         }
@@ -645,6 +646,24 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
       if (sendBtn) sendBtn.disabled = false;
       if (messageStream) messageStream.scrollTop = messageStream.scrollHeight;
     }
+  }
+
+  function renderReferenceDetails(references: any[]) {
+    if (!Array.isArray(references) || references.length === 0) return '';
+    const items = references
+      .map(
+        (ref: any) => `
+          <li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>
+        `,
+      )
+      .join('');
+
+    return `
+      <details class="summary-sources chat-sources">
+        <summary class="summary-sources-toggle">References</summary>
+        <ul>${items}</ul>
+      </details>
+    `;
   }
 
   const usePresignUpload = (import.meta.env.PUBLIC_UPLOAD_METHOD as string | undefined) === 'presign';

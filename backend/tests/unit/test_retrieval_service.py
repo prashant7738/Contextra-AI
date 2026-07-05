@@ -119,3 +119,70 @@ def test_generate_detailed_summary_for_all_uses_broader_topic_coverage(monkeypat
     assert len(captured["queries"]) == 2
     assert chunks_used == 2
     assert {ref["page"] for ref in references} == {2, 5}
+
+
+def test_parse_detailed_summary_output_deduplicates_repeated_items():
+    output = '''
+    {
+      "title": "Algorithms",
+      "sections": [
+        {"heading": "Core Concepts", "items": ["Binary search divides the array", "Binary search divides the array", "Merge sort splits and merges"]},
+        {"heading": "Core Concepts", "items": ["Merge sort splits and merges"]},
+        {"heading": "Revision", "items": ["Binary search divides the array"]}
+      ]
+    }
+    '''
+
+    summary, title, sections = retrieval_service._parse_detailed_summary_output(output, "all")
+
+    assert title == "Algorithms"
+    assert sections == [
+        {"heading": "Core Concepts", "items": ["Binary search divides the array", "Merge sort splits and merges"]},
+        {"heading": "Revision", "items": ["Binary search divides the array"]},
+    ]
+    assert summary.count("Binary search divides the array") == 2
+
+
+def test_generate_flashcards_deduplicates_duplicate_cards(monkeypatch):
+    monkeypatch.setattr(retrieval_service, "embed_texts", lambda texts: [[texts[0]]])
+    monkeypatch.setattr(
+        retrieval_service,
+        "query_similar",
+        lambda query_embedding, n_results, user_id, chat_id: {
+            "documents": [["Topic A details", "Topic B details"]],
+            "metadatas": [[
+                {"filename": "notes.pdf", "page": 1, "document_id": 1},
+                {"filename": "notes.pdf", "page": 2, "document_id": 1},
+            ]],
+        },
+    )
+    async def fake_generate_flashcards_llm(*args, **kwargs):
+        return '''
+<<<FLASHCARD>>>
+TOPIC: Binary Search
+SUMMARY: Search halves the array
+EXPLANATION: It compares the middle element.
+<<<END>>>
+<<<FLASHCARD>>>
+TOPIC: Binary Search
+SUMMARY: Search halves the array
+EXPLANATION: It compares the middle element.
+<<<END>>>
+'''
+
+    monkeypatch.setattr(retrieval_service, "generate_flashcards_llm", fake_generate_flashcards_llm)
+    monkeypatch.setattr(retrieval_service, "consume_user_tokens", lambda *args, **kwargs: None)
+
+    cards, references = asyncio.run(
+        retrieval_service.generate_flashcards(
+            db=None,
+            user_id=1,
+            chat_id=1,
+            n_results=5,
+            max_tokens=1000,
+        )
+    )
+
+    assert len(cards) == 1
+    assert cards[0]["topic"] == "Binary Search"
+    assert len(references) == 2
