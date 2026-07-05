@@ -71,6 +71,10 @@ import ThemeToggle from '../components/ThemeToggle.astro';
               <span class="profile-field-label">Email</span>
               <span id="pf-email" class="profile-field-value">—</span>
             </div>
+            <div class="profile-field">
+              <span class="profile-field-label">Tokens</span>
+              <span id="pf-tokens" class="profile-field-value">—</span>
+            </div>
           </div>
 
           <div class="profile-actions">
@@ -215,7 +219,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 
     <script>
       (function () {
-        let user: { name?: string; email?: string; id?: number | string } | null = null;
+        let user: { name?: string; email?: string; id?: number | string; token_limit?: number; tokens_used?: number } | null = null;
         try {
           const userJson = localStorage.getItem('current_user');
           if (userJson) user = JSON.parse(userJson);
@@ -241,6 +245,11 @@ import ThemeToggle from '../components/ThemeToggle.astro';
         setText('profile-email', email);
         setText('pf-name', fullName);
         setText('pf-email', email);
+
+        const tokenLimit = user.token_limit ?? 0;
+        const tokensUsed = user.tokens_used ?? 0;
+        const remaining = Math.max(tokenLimit - tokensUsed, 0);
+        setText('pf-tokens', `${remaining.toLocaleString()} / ${tokenLimit.toLocaleString()}`);
 
         document.getElementById('profile-logout-btn')?.addEventListener('click', () => {
           ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));
