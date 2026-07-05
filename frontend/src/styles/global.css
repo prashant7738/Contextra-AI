@@ -1631,7 +1631,7 @@ textarea {
 
 .flashcard-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1939,8 +1939,7 @@ textarea {
 
 /* Directly target the numeric counters for extra contrast */
 #flashcard-topic-count,
-#flashcard-count,
-#flashcard-chunk-count {
+#flashcard-count {
   color: #0b1010;
 }
 
@@ -2271,9 +2270,21 @@ textarea {
   color: var(--color-text);
 }
 
+:root[data-theme="dark"] #flashcard-panel-container .flashcard-stat span {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme="dark"] #flashcard-panel-container .flashcard-status,
+:root[data-theme="dark"] #flashcard-panel-container .status-line {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme="dark"] #flashcard-panel-container .empty {
+  color: var(--color-text-muted);
+}
+
 :root[data-theme="dark"] #flashcard-topic-count,
-:root[data-theme="dark"] #flashcard-count,
-:root[data-theme="dark"] #flashcard-chunk-count {
+:root[data-theme="dark"] #flashcard-count {
   color: var(--color-text);
 }
 

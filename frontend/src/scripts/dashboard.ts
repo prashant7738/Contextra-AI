@@ -73,7 +73,6 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const flashcardStatus = document.getElementById('flashcard-status');
   const flashcardTopicCount = document.getElementById('flashcard-topic-count');
   const flashcardCount = document.getElementById('flashcard-count');
-  const flashcardChunkCount = document.getElementById('flashcard-chunk-count');
 
   const frameRails = document.getElementById('frame-rails');
   const leftResize = document.getElementById('left-resize');
@@ -965,7 +964,6 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     }
 
     const nResults = Number(flashcardResults?.value || 5);
-    if (flashcardChunkCount) flashcardChunkCount.textContent = String(nResults);
     if (flashcardGenerateBtn) flashcardGenerateBtn.disabled = true;
     flashcardOutput.innerHTML = '<p class="empty">Generating flashcards...</p>';
     setFlashcardStatus('Generating...', 'warning');
