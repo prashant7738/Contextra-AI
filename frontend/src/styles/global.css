@@ -2017,16 +2017,71 @@ textarea {
     padding: 12px;
   }
 
-  .topbar,
+  .topbar {
+    position: sticky;
+    top: 10px;
+    z-index: 1500;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .topbar-brand {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .topbar-brand h1 {
+    font-size: 1.02rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-brand .eyebrow {
+    display: none;
+  }
+
+  .topbar-nav {
+    display: none;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .theme-toggle-navbar {
+    padding: 0;
+    transform: scale(0.92);
+    transform-origin: center right;
+  }
+
+  .profile-pill {
+    padding: 4px 8px 4px 4px;
+    gap: 6px;
+  }
+
+  .profile-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
   .sidebar,
   .workspace {
     padding: 18px;
   }
 
-  .topbar,
   .topbar-actions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 
   .workspace-head,
@@ -2092,6 +2147,50 @@ textarea {
 
   .frame-rails {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .mobile-overlay {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: 68px;
+    bottom: auto;
+    max-height: calc(100vh - 84px);
+    z-index: 1590;
+    background: var(--color-surface-overlay);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: 0 24px 64px rgba(15, 17, 21, 0.18);
+    display: grid;
+    place-items: start;
+    padding: 14px;
+    overflow: auto;
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-overlay-inner {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    gap: 14px;
+  }
+
+  .mobile-overlay-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .mobile-overlay-chats {
+    margin-top: 0;
+  }
+
+  .mobile-overlay .button,
+  .mobile-overlay .chat-item,
+  .mobile-overlay .row-form,
+  .mobile-overlay .stack {
+    width: 100%;
   }
 }
 
