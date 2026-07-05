@@ -8,6 +8,7 @@ from app.database import SessionLocal
 from app.models.summary_task import SummaryTask
 from app.services.retrieval_service import answer_query, generate_detailed_summary
 from app.services.chat_service import get_chat
+from app.repositories.chat_repository import get_chat_by_id
 
 
 def start_summary_task(db: Session, params: dict) -> str:
@@ -68,8 +69,8 @@ async def _run_summary_task_async(task_id: str, params: dict, db: Session):
     n_results = params.get("n_results", 5)
     max_tokens = params.get("max_tokens", 700)
 
-    chat = get_chat(db, chat_id, user_id)
-    if chat is None:
+    chat = get_chat_by_id(db, chat_id)
+    if chat is None or chat.user_id != user_id:
         raise ValueError("Chat not found or doesn't belong to you")
 
     normalized_topic = topic_name.strip().lower() if topic_name else ""
