@@ -23,8 +23,11 @@ def _ask_llm_sync(context: str, question: str, max_tokens: int = 800) -> str:
     """Synchronous LLM call - runs in thread pool."""
     client = get_llm()
     prompt = f"""
-You are a helpful assistant. Use the following context to answer the question.
-If you don't know the answer, say you don't know.
+You are a helpful assistant.
+Use the following context to answer the question by synthesizing all relevant excerpts.
+Do not say you don't know just because the wording is different or the answer must be combined from multiple chunks.
+Only say you don't know if the context truly does not support an answer.
+Prefer a direct answer first, then brief supporting detail if helpful.
 
 Context:
 {context}

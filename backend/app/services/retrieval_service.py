@@ -92,7 +92,7 @@ async def answer_query(
     if not docs:
         raise ValueError("No uploaded notes found in this chat")
 
-    context = "\n\n".join(docs)
+    context = _format_context_with_references(docs, references)
     
     # Build conversation history context if available
     history_context = ""
@@ -107,6 +107,16 @@ async def answer_query(
     full_context = context + history_context
     consume_user_tokens(db, user_id, estimate_token_cost(full_context, question, max_tokens=max_tokens))
     return await ask_llm(full_context, question, max_tokens=max_tokens), references
+
+
+def _format_context_with_references(docs: list[str], references: list[dict]) -> str:
+    blocks: list[str] = []
+    for index, doc in enumerate(docs):
+        reference = references[index] if index < len(references) else {}
+        filename = reference.get("filename", "unknown")
+        page = reference.get("page", 0)
+        blocks.append(f"[Source: {filename} p.{page}]\n{doc}")
+    return "\n\n".join(blocks)
 
 
 def _build_question_queries(question: str) -> list[str]:
