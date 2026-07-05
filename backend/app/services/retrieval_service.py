@@ -15,6 +15,51 @@ from sqlalchemy.orm import Session
 BROAD_FALLBACK_QUERY = "Provide a high-yield summary of these study notes"
 
 
+async def _retrieve_context(
+    queries: list[str],
+    user_id: int,
+    chat_id: int,
+    n_results: int,
+) -> tuple[list[str], list[dict]]:
+    documents: list[str] = []
+    references: list[dict] = []
+    seen = set()
+
+    for query in queries:
+        normalized_query = query.strip()
+        if not normalized_query:
+            continue
+
+        query_embedding = (await asyncio.to_thread(embed_texts, [normalized_query]))[0]
+        results = await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
+
+        for document, metadata in zip(results.get("documents", [[]])[0], results.get("metadatas", [[]])[0]):
+            cleaned_document = str(document).strip()
+            if not cleaned_document:
+                continue
+
+            reference_key = (
+                cleaned_document,
+                metadata.get("filename", "unknown"),
+                metadata.get("page", 0),
+                metadata.get("document_id"),
+            )
+            if reference_key in seen:
+                continue
+
+            seen.add(reference_key)
+            documents.append(cleaned_document)
+            references.append(
+                {
+                    "filename": metadata.get("filename", "unknown"),
+                    "page": metadata.get("page", 0),
+                    "document_id": metadata.get("document_id"),
+                }
+            )
+
+    return documents, references
+
+
 async def answer_query(
     db: Session,
     question: str,
@@ -35,24 +80,17 @@ async def answer_query(
     Returns:
         Tuple of (answer, references) where references are the source chunks used
     """
-    query_embedding = (await asyncio.to_thread(embed_texts, [question]))[0]
-    results = await asyncio.to_thread(query_similar, query_embedding, 10, user_id, chat_id)
-    
-    docs = results.get("documents", [[]])[0]
-    distances = results.get("distances", [[]])[0]
-    
-    # Fallback to broad query if similarity is low (no results or top result distance > 0.55)
-    should_fallback = (
-        not docs
-        or not distances
-        or min(distances) > 0.55
+    docs, references = await _retrieve_context(
+        queries=[question, BROAD_FALLBACK_QUERY],
+        user_id=user_id,
+        chat_id=chat_id,
+        n_results=max(10, max_tokens // 80),
     )
-    if should_fallback:
-        broad_embedding = (await asyncio.to_thread(embed_texts, [BROAD_FALLBACK_QUERY]))[0]
-        results = await asyncio.to_thread(query_similar, broad_embedding, 10, user_id, chat_id)
-    
-    context = "\n\n".join(results.get("documents", [[]])[0])
-    references = _extract_references(results)
+
+    if not docs:
+        raise ValueError("No uploaded notes found in this chat")
+
+    context = "\n\n".join(docs)
     
     # Build conversation history context if available
     history_context = ""
@@ -97,25 +135,31 @@ async def generate_detailed_summary(
         ValueError: If no exact content is found for chat/topic
     """
     normalized_topic = topic_name.strip()
-    retrieval_query = (
-        "Provide a high-yield summary of these study notes"
-        if normalized_topic.lower() == "all"
-        else normalized_topic
+    if normalized_topic.lower() == "all":
+        retrieval_queries = [
+            BROAD_FALLBACK_QUERY,
+            "List all major topics and subtopics from these study notes",
+        ]
+        search_limit = max(n_results, 12)
+    else:
+        retrieval_queries = [
+            normalized_topic,
+            f"{normalized_topic} study notes",
+            BROAD_FALLBACK_QUERY,
+        ]
+        search_limit = max(n_results, 8)
+
+    docs, references = await _retrieve_context(
+        queries=retrieval_queries,
+        user_id=user_id,
+        chat_id=chat_id,
+        n_results=search_limit,
     )
 
-    query_embedding = (await asyncio.to_thread(embed_texts, [retrieval_query]))[0]
-    results = await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
-
-    docs = results.get("documents", [[]])[0]
     if not docs:
         raise ValueError("No uploaded notes found in this chat")
-    
-    # Note: For topic searches beyond "all", the vector similarity search 
-    # already filtered for relevant documents. Removing strict substring 
-    # validation to handle typos and semantic variations.
 
     context = "\n\n".join(docs)
-    references = _extract_references(results)
     
     # If a pre-generated answer exists, include it in the context
     # This gives the LLM the initial query result to expand upon
@@ -242,16 +286,17 @@ async def generate_flashcards(
         ValueError: If no content found or JSON parsing fails
     """
     # Step 1: Get all content from the chat
-    retrieval_query = "Provide a high-yield summary of these study notes"
-    query_embedding = embed_texts([retrieval_query])[0]
-    results = query_similar(query_embedding, n_results=n_results, user_id=user_id, chat_id=chat_id)
-    
-    docs = results.get("documents", [[]])[0]
+    docs, references = await _retrieve_context(
+        queries=["Provide a high-yield summary of these study notes"],
+        user_id=user_id,
+        chat_id=chat_id,
+        n_results=max(n_results, 8),
+    )
+
     if not docs:
         raise ValueError("No uploaded notes found in this chat")
     
     context = "\n\n".join(docs)
-    references = _extract_references(results)
     
     # Step 2: Generate flashcards using LLM
     consume_user_tokens(db, user_id, estimate_token_cost(context, max_tokens=max_tokens))
