@@ -12,6 +12,9 @@ import re
 from sqlalchemy.orm import Session
 
 
+BROAD_FALLBACK_QUERY = "Provide a high-yield summary of these study notes"
+
+
 async def answer_query(
     db: Session,
     question: str,
@@ -34,6 +37,20 @@ async def answer_query(
     """
     query_embedding = (await asyncio.to_thread(embed_texts, [question]))[0]
     results = await asyncio.to_thread(query_similar, query_embedding, 10, user_id, chat_id)
+    
+    docs = results.get("documents", [[]])[0]
+    distances = results.get("distances", [[]])[0]
+    
+    # Fallback to broad query if similarity is low (no results or top result distance > 0.55)
+    should_fallback = (
+        not docs
+        or not distances
+        or min(distances) > 0.55
+    )
+    if should_fallback:
+        broad_embedding = (await asyncio.to_thread(embed_texts, [BROAD_FALLBACK_QUERY]))[0]
+        results = await asyncio.to_thread(query_similar, broad_embedding, 10, user_id, chat_id)
+    
     context = "\n\n".join(results.get("documents", [[]])[0])
     references = _extract_references(results)
     
