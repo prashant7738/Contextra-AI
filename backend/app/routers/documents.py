@@ -3,7 +3,7 @@ import tempfile
 from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, File, Query, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,15 +21,43 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+# Reject uploads larger than this to avoid unbounded memory/CPU use during
+# OCR/embedding (and unbounded cost against the LLM/embedding provider).
+MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
+PDF_MAGIC_BYTES = b"%PDF-"
+
 
 class PresignRequest(BaseModel):
-    filename: str
+    filename: str = Field(..., min_length=1, max_length=255)
 
 
 class PresignResponse(BaseModel):
     task_id: int
     upload_url: str
     upload_method: str = "PUT"
+
+
+async def _read_upload_within_limit(upload: UploadFile, max_bytes: int) -> bytes:
+    """Stream-read an upload, aborting as soon as it exceeds max_bytes.
+
+    Avoids buffering an unbounded amount of attacker-controlled data into
+    memory before rejecting an oversized file.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    chunk_size = 1024 * 1024
+    while True:
+        chunk = await upload.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{upload.filename}' exceeds maximum allowed size of {max_bytes // (1024 * 1024)}MB",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @router.get("/", response_model=List[DocumentResponse])
@@ -143,7 +171,12 @@ async def direct_ingest(
 
     created_tasks: list[IngestionTask] = []
     for upload in uploaded_files:
-        contents = await upload.read()
+        if not upload.filename or not upload.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=422, detail=f"Only PDF files are supported: {upload.filename or 'unknown'}")
+
+        contents = await _read_upload_within_limit(upload, MAX_UPLOAD_SIZE_BYTES)
+        if not contents.startswith(PDF_MAGIC_BYTES):
+            raise HTTPException(status_code=422, detail=f"File is not a valid PDF: {upload.filename}")
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
         try:

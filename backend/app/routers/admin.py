@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -22,7 +24,7 @@ class UserTokenLimitUpdate(BaseModel):
 def _ensure_admin(current_user: UserResponse):
     if not settings.admin_email:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Admin not configured")
-    if current_user.email != settings.admin_email:
+    if not secrets.compare_digest(current_user.email, settings.admin_email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
 

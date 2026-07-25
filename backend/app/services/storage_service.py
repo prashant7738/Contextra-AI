@@ -10,6 +10,10 @@ from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# Guard against unbounded downloads (e.g. a tampered/huge object) consuming
+# excessive memory/disk during ingestion.
+MAX_DOWNLOAD_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
+
 
 def is_supabase_configured() -> bool:
     return bool(settings.supabase_url and settings.supabase_service_role_key)
@@ -74,19 +78,28 @@ def _supabase_download(object_path: str) -> str:
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
     }
 
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
+    tmp_path = tmp.name
+    total = 0
     try:
-        resp = httpx.get(url, headers=headers, timeout=120)
+        with httpx.stream("GET", url, headers=headers, timeout=120) as resp:
+            resp.raise_for_status()
+            for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                total += len(chunk)
+                if total > MAX_DOWNLOAD_SIZE_BYTES:
+                    raise RuntimeError(
+                        f"Downloaded object exceeds maximum allowed size of "
+                        f"{MAX_DOWNLOAD_SIZE_BYTES // (1024 * 1024)}MB"
+                    )
+                tmp.write(chunk)
     except Exception:
         logger.exception("Supabase download failed")
-        raise
-    resp.raise_for_status()
-
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", prefix="ingest_")
-    try:
-        tmp.write(resp.content)
-        tmp_path = tmp.name
-    finally:
         tmp.close()
+        cleanup_temp_file(tmp_path)
+        raise
+    finally:
+        if not tmp.closed:
+            tmp.close()
 
     logger.info(f"Downloaded {object_path} to {tmp_path}")
     return tmp_path

@@ -5,18 +5,19 @@ from app.schemas.user import UserCreate, UserResponse
 from app.schemas.auth import UserLogin, TokenResponse, RefreshTokenRequest
 from app.services import auth_service
 from app.dependencies import get_current_user
+from app.core.rate_limit import rate_limit_login, rate_limit_register
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register", response_model=TokenResponse, dependencies=[Depends(rate_limit_register)])
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     return auth_service.register_user(db, user_data)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_login)])
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
     """Login user with email and password."""
     return auth_service.login_user(db, login_data)

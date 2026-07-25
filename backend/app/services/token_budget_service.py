@@ -15,15 +15,16 @@ def estimate_token_cost(*parts: str, max_tokens: int) -> int:
 
 
 def consume_user_tokens(db: Session, user_id: int, token_cost: int) -> None:
+    updated_user = user_repository.try_consume_user_tokens(db, user_id, token_cost)
+    if updated_user is not None:
+        return
+
     user = user_repository.get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    remaining_tokens = user.token_limit - user.tokens_used
-    if token_cost > remaining_tokens:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Token limit exceeded. Remaining tokens: {max(remaining_tokens, 0)}",
-        )
-
-    user_repository.add_user_token_usage(db, user_id, token_cost)
+    remaining_tokens = max(user.token_limit - user.tokens_used, 0)
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=f"Token limit exceeded. Remaining tokens: {remaining_tokens}",
+    )

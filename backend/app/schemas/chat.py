@@ -4,7 +4,7 @@ from typing import Optional
 
 
 class ChatCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=200)
 
 
 class ChatResponse(BaseModel):
@@ -41,7 +41,7 @@ class SummarySection(BaseModel):
 
 class QueryRequest(BaseModel):
     chat_id: int
-    request: str
+    request: str = Field(..., min_length=1, max_length=4000)
 
 
 class QueryResponse(BaseModel):
@@ -52,7 +52,7 @@ class QueryResponse(BaseModel):
 
 class DetailedSummaryRequest(BaseModel):
     chat_id: int
-    topic_name: str = "all"
+    topic_name: str = Field(default="all", max_length=200)
     n_results: int = Field(default=5, ge=3, le=40)
     max_tokens: int = Field(default=700, ge=200, le=1200)
 

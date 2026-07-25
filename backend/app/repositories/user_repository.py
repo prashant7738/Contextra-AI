@@ -1,3 +1,4 @@
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -50,6 +51,31 @@ def add_user_token_usage(db: Session, user_id: int, token_usage: int) -> User | 
     db.commit()
     db.refresh(user)
     return user
+
+
+def try_consume_user_tokens(db: Session, user_id: int, token_cost: int) -> User | None:
+    """Atomically deduct token_cost from a user's remaining budget.
+
+    Uses a single conditional UPDATE (checked and applied by the database in
+    one statement) instead of a separate read-then-write, so concurrent
+    requests from the same user can't both pass a stale "remaining tokens"
+    check and jointly exceed token_limit.
+
+    Returns the updated User on success, or None if the user doesn't exist or
+    doesn't have enough remaining budget.
+    """
+    result = db.execute(
+        update(User)
+        .where(
+            User.id == user_id,
+            (User.token_limit - User.tokens_used) >= token_cost,
+        )
+        .values(tokens_used=User.tokens_used + token_cost)
+    )
+    db.commit()
+    if result.rowcount == 0:
+        return None
+    return get_user_by_id(db, user_id)
 
 
 def delete_user(db: Session, user_id: int) -> bool:
