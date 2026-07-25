@@ -1,10 +1,14 @@
 import asyncio
 from app.core.embeddings import embed_texts
-from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm
+from app.core.llm import ask_detailed_summary_llm, ask_llm, generate_flashcards_llm, generate_quiz_llm
 from app.repositories.pgvector_repository import query_similar
 from app.services.flashcard_parsing import (
     parse_flashcard_json_fallback,
     parse_flashcard_marker_output,
+)
+from app.services.quiz_parsing import (
+    parse_quiz_json_fallback,
+    parse_quiz_marker_output,
 )
 from app.services.token_budget_service import consume_user_tokens, estimate_token_cost
 import json
@@ -424,6 +428,96 @@ def _dedupe_flashcards(flashcards: list[dict]) -> list[dict]:
         deduped.append({
             "topic": topic,
             "summary": summary,
+            "explanation": explanation,
+        })
+
+    return deduped
+
+
+async def generate_quiz(
+    db: Session,
+    user_id: int,
+    chat_id: int,
+    num_questions: int = 5,
+    max_tokens: int = 1500,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Generate multiple-choice quiz questions from all uploaded notes in a chat.
+
+    Args:
+        user_id: ID of the user (for access control)
+        chat_id: ID of the chat (for context filtering)
+        num_questions: Number of MCQ questions to generate
+        max_tokens: Max tokens for LLM output
+
+    Returns:
+        Tuple of (questions, references) where:
+        - questions: List of dicts with question, options, correct_index, explanation
+        - references: List of unique document references used
+
+    Raises:
+        ValueError: If no content found or parsing fails
+    """
+    docs, references = await _retrieve_context(
+        queries=[BROAD_FALLBACK_QUERY],
+        user_id=user_id,
+        chat_id=chat_id,
+        n_results=max(num_questions, 8),
+    )
+
+    if not docs:
+        raise ValueError("No uploaded notes found in this chat")
+
+    context = "\n\n".join(docs)
+
+    consume_user_tokens(db, user_id, estimate_token_cost(context, max_tokens=max_tokens))
+    quiz_output = await generate_quiz_llm(context, num_questions=num_questions, max_tokens=max_tokens)
+
+    questions = parse_quiz_marker_output(quiz_output)
+    if not questions:
+        questions = parse_quiz_json_fallback(quiz_output)
+
+    if not questions:
+        raise ValueError(
+            "Failed to parse quiz questions from model output. "
+            f"Response preview: {quiz_output[:400]}..."
+        )
+
+    questions = _dedupe_quiz_questions(questions)[:num_questions]
+
+    for question in questions:
+        question["references"] = references
+
+    return questions, references
+
+
+def _dedupe_quiz_questions(questions: list[dict]) -> list[dict]:
+    deduped: list[dict] = []
+    seen = set()
+
+    for item in questions:
+        question = str(item.get("question", "")).strip()
+        options = item.get("options", [])
+        explanation = str(item.get("explanation", "")).strip()
+        correct_index = item.get("correct_index")
+        key = _normalize_text(question)
+
+        if (
+            not question
+            or not isinstance(options, list)
+            or len(options) != 4
+            or not all(str(opt).strip() for opt in options)
+            or not isinstance(correct_index, int)
+            or not (0 <= correct_index <= 3)
+            or key in seen
+        ):
+            continue
+
+        seen.add(key)
+        deduped.append({
+            "question": question,
+            "options": [str(opt).strip() for opt in options],
+            "correct_index": correct_index,
             "explanation": explanation,
         })
 

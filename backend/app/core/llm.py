@@ -141,3 +141,45 @@ Content:
 async def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
     """Async wrapper for flashcard generation - runs in thread pool to avoid blocking."""
     return await asyncio.to_thread(_generate_flashcards_llm_sync, context, max_tokens)
+
+
+def _generate_quiz_llm_sync(context: str, num_questions: int, max_tokens: int = 1500) -> str:
+    """Synchronous MCQ quiz generation - runs in thread pool."""
+    client = get_llm()
+    prompt = f"""Generate exactly {num_questions} multiple-choice quiz questions from the content below.
+
+Output constraints (strict):
+- Do NOT return JSON.
+- Return only repeated blocks in this exact structure:
+
+<<<MCQ>>>
+QUESTION: <question text>
+A: <option text>
+B: <option text>
+C: <option text>
+D: <option text>
+CORRECT: <A|B|C|D>
+EXPLANATION: <1-2 sentence explanation of why the correct answer is right>
+<<<END>>>
+
+Rules:
+1. Produce exactly {num_questions} blocks, no more, no fewer.
+2. Each question must have exactly 4 distinct, plausible options.
+3. Only one option is correct; CORRECT must be a single letter A, B, C, or D.
+4. Cover a range of topics/subtopics from the content, avoid duplicate questions.
+5. No extra text outside the blocks.
+
+Content:
+{context}
+"""
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+        temperature=0.2,
+    )
+    return response.choices[0].message.content
+
+
+async def generate_quiz_llm(context: str, num_questions: int, max_tokens: int = 1500) -> str:
+    """Async wrapper for quiz generation - runs in thread pool to avoid blocking."""
+    return await asyncio.to_thread(_generate_quiz_llm_sync, context, num_questions, max_tokens)

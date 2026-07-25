@@ -4,5 +4,6 @@ from app.models.document import Document
 from app.models.embedding import Embedding
 from app.models.ingestion_task import IngestionTask
 from app.models.summary_task import SummaryTask
+from app.models.quiz import Quiz, QuizAttempt
 
-__all__ = ["User", "Chat", "Document", "Embedding", "IngestionTask", "SummaryTask"]
+__all__ = ["User", "Chat", "Document", "Embedding", "IngestionTask", "SummaryTask", "Quiz", "QuizAttempt"]

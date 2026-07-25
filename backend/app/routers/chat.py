@@ -19,6 +19,15 @@ from app.schemas.chat import (
     FlashcardResponse,
     Flashcard,
 )
+from app.schemas.quiz import (
+    QuizRequest,
+    QuizGenerateResponse,
+    QuizQuestionPublic,
+    QuizSubmitRequest,
+    QuizSubmitResponse,
+    QuizQuestionResult,
+    QuizHistoryItem,
+)
 from app.services.chat_service import (
     create_chat,
     list_user_chats,
@@ -26,8 +35,9 @@ from app.services.chat_service import (
     delete_chat,
 )
 from app.services.chat_service import update_chat_name
-from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards
-from app.repositories import message_repository
+from app.services.retrieval_service import answer_query, generate_detailed_summary, generate_flashcards, generate_quiz
+from app.services.quiz_service import grade_quiz_answers
+from app.repositories import message_repository, quiz_repository
 from app.tasks import start_summary_task
 from app.models import SummaryTask
 
@@ -342,3 +352,169 @@ def get_summary_task_status(
         result=DetailedSummaryResponse(**task.result) if task.result else None,
         error=task.error,
     )
+
+
+@router.post("/quiz", response_model=QuizGenerateResponse)
+async def generate_quiz_endpoint(
+    user_id: int,
+    chat_id: int,
+    payload: Optional[QuizRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Generate an MCQ quiz from all uploaded notes in a chat.
+
+    The response never includes correct answers or explanations - those are
+    only revealed after the user submits their answers via /quiz/{quiz_id}/submit.
+
+    Args:
+        user_id: ID of the user requesting the quiz (query param)
+        chat_id: ID of the chat (query param)
+        payload: Optional quiz request with num_questions/max_tokens (defaults if not provided)
+        db: Database session
+
+    Returns:
+        QuizGenerateResponse with quiz_id and questions (no answers)
+    """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    chat = get_chat(db, chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    try:
+        num_questions = payload.num_questions if payload else 5
+        max_tokens = payload.max_tokens if payload else 1500
+
+        questions, _references = await generate_quiz(
+            db=db,
+            user_id=user_id,
+            chat_id=chat.id,
+            num_questions=num_questions,
+            max_tokens=max_tokens,
+        )
+
+        quiz = quiz_repository.create_quiz(
+            db=db,
+            user_id=user_id,
+            chat_id=chat.id,
+            num_questions=len(questions),
+            questions=questions,
+        )
+
+        return QuizGenerateResponse(
+            quiz_id=quiz.id,
+            chat_id=quiz.chat_id,
+            num_questions=quiz.num_questions,
+            questions=[
+                QuizQuestionPublic(question=q["question"], options=q["options"])
+                for q in questions
+            ],
+            created_at=quiz.created_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error generating quiz: {str(exc)}")
+
+
+@router.post("/quiz/{quiz_id}/submit", response_model=QuizSubmitResponse)
+def submit_quiz(
+    quiz_id: int,
+    user_id: int,
+    payload: QuizSubmitRequest,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Grade a submitted quiz attempt and reveal correct answers/explanations.
+
+    Args:
+        quiz_id: ID of the previously generated quiz
+        user_id: ID of the user submitting answers (query param)
+        payload: Selected answer index per question
+        db: Database session
+
+    Returns:
+        QuizSubmitResponse with per-question correctness, explanations, and score
+    """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+
+    quiz = quiz_repository.get_quiz(db, quiz_id, user_id)
+    if quiz is None:
+        raise HTTPException(status_code=404, detail="Quiz not found or doesn't belong to you")
+
+    questions = quiz.questions or []
+    answers = payload.answers
+    if len(answers) != len(questions):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Expected {len(questions)} answers, received {len(answers)}",
+        )
+
+    results: list[QuizQuestionResult] = []
+    score, graded_results = grade_quiz_answers(questions, answers)
+    for result in graded_results:
+        results.append(
+            QuizQuestionResult(
+                question=result["question"],
+                options=result["options"],
+                selected_index=result["selected_index"],
+                correct_index=result["correct_index"],
+                is_correct=result["is_correct"],
+                explanation=result["explanation"],
+                references=[Reference(**ref) for ref in result.get("references", [])],
+            )
+        )
+
+    attempt = quiz_repository.create_quiz_attempt(
+        db=db,
+        quiz_id=quiz.id,
+        user_id=user_id,
+        answers=answers,
+        score=score,
+        total_questions=len(questions),
+    )
+
+    return QuizSubmitResponse(
+        quiz_id=quiz.id,
+        score=score,
+        total_questions=len(questions),
+        results=results,
+        submitted_at=attempt.submitted_at,
+    )
+
+
+@router.get("/quiz-history", response_model=List[QuizHistoryItem])
+def get_quiz_history(
+    user_id: int,
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    List previously generated quizzes for a chat, with their latest attempt score if any.
+    """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
+    chat = get_chat(db, chat_id, user_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
+
+    quizzes = quiz_repository.list_quiz_history(db, user_id, chat.id)
+    history: list[QuizHistoryItem] = []
+    for quiz in quizzes:
+        latest_attempt = quiz_repository.get_latest_attempt(db, quiz.id, user_id)
+        history.append(
+            QuizHistoryItem(
+                quiz_id=quiz.id,
+                num_questions=quiz.num_questions,
+                created_at=quiz.created_at,
+                last_score=latest_attempt.score if latest_attempt else None,
+                last_total_questions=latest_attempt.total_questions if latest_attempt else None,
+                last_submitted_at=latest_attempt.submitted_at if latest_attempt else None,
+            )
+        )
+    return history

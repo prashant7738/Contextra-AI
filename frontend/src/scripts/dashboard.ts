@@ -40,6 +40,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const logoutBtn = document.getElementById('logout-btn');
   const summarizerBtn = document.getElementById('summarizer-btn');
   const flashcardBtn = document.getElementById('flashcard-btn');
+  const quizBtn = document.getElementById('quiz-btn');
   const navChatBtn = document.getElementById('nav-chat-btn');
   const profileMenuToggle = document.getElementById('profile-menu-toggle');
   const profileDropdown = document.getElementById('profile-dropdown');
@@ -47,6 +48,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   let currentView = 'chat';
   const summaryChatPill = document.getElementById('summary-chat-pill');
   const flashcardChatPill = document.getElementById('flashcard-chat-pill');
+  const quizChatPill = document.getElementById('quiz-chat-pill');
   const messageStream = document.getElementById('message-stream');
   const composer = document.getElementById('composer');
   const queryInput = document.getElementById('query-input') as HTMLTextAreaElement | null;
@@ -74,12 +76,19 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const flashcardTopicCount = document.getElementById('flashcard-topic-count');
   const flashcardCount = document.getElementById('flashcard-count');
 
+  const quizGenerateBtn = document.getElementById('quiz-generate') as HTMLButtonElement | null;
+  const quizClearBtn = document.getElementById('quiz-clear');
+  const quizQuestionCount = document.getElementById('quiz-question-count') as HTMLInputElement | null;
+  const quizOutput = document.getElementById('quiz-output');
+  const quizStatus = document.getElementById('quiz-status');
+
   const frameRails = document.getElementById('frame-rails');
   const leftResize = document.getElementById('left-resize');
   const mobileCaretBtn = document.getElementById('mobile-caret');
   const mobileProfileMenu = document.getElementById('mobile-profile-menu');
   const mobileSummBtn = document.getElementById('mobile-summarizer');
   const mobileFlashBtn = document.getElementById('mobile-flashcard');
+  const mobileQuizBtn = document.getElementById('mobile-quiz');
   const mobileLogoutBtn = document.getElementById('mobile-logout');
 
   if (identityPill) identityPill.textContent = user.name;
@@ -98,8 +107,12 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   let selectedUploadFile: File | null = null;
   const flashcardExpanded = new Set<number>();
   let topbarSyncRaf = 0;
+  let currentQuizId: number | null = null;
+  let currentQuizQuestions: any[] = [];
+  const quizSelectedAnswers = new Map<number, number>();
+  let quizSubmitted = false;
 
-  function getChatCacheKey(kind: 'summary' | 'flashcards', chatId: number) {
+  function getChatCacheKey(kind: 'summary' | 'flashcards' | 'quiz', chatId: number) {
     return `dashboard_${kind}_cache_${user.id}_${chatId}`;
   }
 
@@ -107,7 +120,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     return `dashboard_summary_history_${user.id}_${chatId}`;
   }
 
-  function readChatCache(kind: 'summary' | 'flashcards', chatId: number) {
+  function readChatCache(kind: 'summary' | 'flashcards' | 'quiz', chatId: number) {
     try {
       const raw = localStorage.getItem(getChatCacheKey(kind, chatId));
       return raw ? JSON.parse(raw) : null;
@@ -126,7 +139,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     }
   }
 
-  function writeChatCache(kind: 'summary' | 'flashcards', chatId: number, value: any) {
+  function writeChatCache(kind: 'summary' | 'flashcards' | 'quiz', chatId: number, value: any) {
     try {
       localStorage.setItem(getChatCacheKey(kind, chatId), JSON.stringify(value));
     } catch {
@@ -217,6 +230,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
           if (composer) composer.hidden = true;
           if (summaryChatPill) summaryChatPill.textContent = 'No chat selected';
           if (flashcardChatPill) flashcardChatPill.textContent = 'No chat selected';
+          if (quizChatPill) quizChatPill.textContent = 'No chat selected';
           try { updateTopbarButtons(); } catch {}
         }
       }
@@ -350,6 +364,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
                 if (chatTitle) chatTitle.textContent = 'Select a chat';
                 if (summaryChatPill) summaryChatPill.textContent = 'No chat selected';
                 if (flashcardChatPill) flashcardChatPill.textContent = 'No chat selected';
+                if (quizChatPill) quizChatPill.textContent = 'No chat selected';
                 try { updateTopbarButtons(); } catch {}
               }
 
@@ -382,6 +397,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     if (chatTitle) chatTitle.textContent = chatName;
     if (summaryChatPill) summaryChatPill.textContent = chatName;
     if (flashcardChatPill) flashcardChatPill.textContent = chatName;
+    if (quizChatPill) quizChatPill.textContent = chatName;
     chatList?.querySelectorAll('.chat-item').forEach((c) => c.classList.remove('chat-item-active'));
     const activeBtn = chatList?.querySelector(`[data-local-id="${localId}"]`);
     if (activeBtn) activeBtn.classList.add('chat-item-active');
@@ -391,6 +407,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     setStatus('');
     resetSummary();
     clearFlashcards();
+    clearQuiz();
     await loadMessages(localId);
 
     try { await renderChatDocuments(localId); } catch (e) { console.debug('Refresh docs on select failed', e); }
@@ -434,6 +451,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   const overlayChatBtn = document.getElementById('overlay-chat');
   const overlaySummBtn = document.getElementById('overlay-summarizer');
   const overlayFlashBtn = document.getElementById('overlay-flashcard');
+  const overlayQuizBtn = document.getElementById('overlay-quiz');
   const overlayLogoutBtn = document.getElementById('overlay-logout');
 
   function closeMobileOverlay() {
@@ -471,6 +489,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   overlayChatBtn?.addEventListener('click', () => { (navChatBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlaySummBtn?.addEventListener('click', () => { (summarizerBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlayFlashBtn?.addEventListener('click', () => { (flashcardBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
+  overlayQuizBtn?.addEventListener('click', () => { (quizBtn as HTMLElement | null)?.click(); closeMobileOverlay(); });
   overlayLogoutBtn?.addEventListener('click', () => { (logoutBtn as HTMLElement | null)?.click(); });
 
   if (mobileSummBtn) {
@@ -485,6 +504,15 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   if (mobileFlashBtn) {
     mobileFlashBtn.addEventListener('click', () => {
       const btn = document.getElementById('flashcard-btn') as HTMLElement | null;
+      btn?.click();
+      if (mobileProfileMenu) mobileProfileMenu.hidden = true;
+      document.getElementById('profile-pill')?.classList.remove('open');
+      mobileCaretBtn?.setAttribute('aria-expanded', 'false');
+    });
+  }
+  if (mobileQuizBtn) {
+    mobileQuizBtn.addEventListener('click', () => {
+      const btn = document.getElementById('quiz-btn') as HTMLElement | null;
       btn?.click();
       if (mobileProfileMenu) mobileProfileMenu.hidden = true;
       document.getElementById('profile-pill')?.classList.remove('open');
@@ -1099,6 +1127,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   function restoreCachedChatArtifacts(chatId: number) {
     restoreSummaryFromCache(chatId);
     restoreFlashcardsFromCache(chatId);
+    restoreQuizFromCache(chatId);
   }
 
   function clearFlashcards() {
@@ -1106,6 +1135,201 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     if (flashcardTopicCount) flashcardTopicCount.textContent = '0';
     if (flashcardCount) flashcardCount.textContent = '0';
     setFlashcardStatus('');
+  }
+
+  function setQuizStatus(message: string, tone?: string) {
+    if (!quizStatus) return;
+    quizStatus.textContent = message;
+    if (tone) quizStatus.dataset.tone = tone;
+    else delete quizStatus.dataset.tone;
+  }
+
+  async function generateQuiz() {
+    if (!selectedChatId || !quizOutput) {
+      setQuizStatus('Select a chat before generating a quiz', 'warning');
+      return;
+    }
+
+    const numQuestions = Number(quizQuestionCount?.value || 5);
+    if (quizGenerateBtn) quizGenerateBtn.disabled = true;
+    quizOutput.innerHTML = '<p class="empty">Generating quiz...</p>';
+    setQuizStatus('Generating...', 'warning');
+    quizSubmitted = false;
+    quizSelectedAnswers.clear();
+
+    try {
+      const resp = await apiFetch(`/chats/quiz?user_id=${user.id}&chat_id=${selectedChatId}`, {
+        method: 'POST',
+        body: JSON.stringify({ num_questions: numQuestions, max_tokens: 1500 }),
+        timeoutMs: 120_000,
+      });
+
+      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
+      const data = await resp.json();
+      currentQuizId = data.quiz_id;
+      currentQuizQuestions = data.questions || [];
+      renderQuiz(currentQuizQuestions);
+      if (selectedChatId) {
+        writeChatCache('quiz', selectedChatId, {
+          quizId: data.quiz_id,
+          questions: currentQuizQuestions,
+          numQuestions,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      setQuizStatus('Quiz generated', 'success');
+    } catch (err: any) {
+      console.error('Quiz error:', err);
+      quizOutput.innerHTML = `<p class="empty">Unable to generate quiz: ${escapeHtml(err.message)}</p>`;
+      setQuizStatus('Generation failed', 'danger');
+    } finally {
+      if (quizGenerateBtn) quizGenerateBtn.disabled = false;
+    }
+  }
+
+  function renderQuiz(questions: any[]) {
+    if (!quizOutput) return;
+
+    if (!questions.length) {
+      quizOutput.innerHTML = '<p class="empty">No quiz questions returned for this chat.</p>';
+      return;
+    }
+
+    quizOutput.innerHTML = `
+      <div class="quiz-grid">
+        ${questions
+          .map((q: any, index: number) => {
+            const options = (q.options || [])
+              .map((option: string, optIndex: number) => {
+                const letter = String.fromCharCode(65 + optIndex);
+                return `
+                  <label class="quiz-option" data-question-index="${index}" data-option-index="${optIndex}">
+                    <input type="radio" name="quiz-q-${index}" value="${optIndex}" />
+                    <span class="quiz-option-letter">${letter}</span>
+                    <span class="quiz-option-text">${escapeHtml(option)}</span>
+                  </label>
+                `;
+              })
+              .join('');
+
+            return `
+              <article class="quiz-question-card" data-question-index="${index}">
+                <p class="quiz-question-text"><span class="quiz-question-number">Q${index + 1}.</span> ${escapeHtml(q.question || '')}</p>
+                <div class="quiz-options">${options}</div>
+              </article>
+            `;
+          })
+          .join('')}
+      </div>
+      <div class="quiz-submit-row">
+        <button id="quiz-submit" class="button button-primary" type="button">Submit Quiz</button>
+      </div>
+    `;
+
+    quizOutput.querySelectorAll('input[type="radio"]').forEach((input: any) => {
+      input.addEventListener('change', (ev: any) => {
+        const label = ev.target.closest('.quiz-option');
+        if (!label) return;
+        const questionIndex = Number(label.dataset.questionIndex);
+        const optionIndex = Number(label.dataset.optionIndex);
+        quizSelectedAnswers.set(questionIndex, optionIndex);
+      });
+    });
+
+    document.getElementById('quiz-submit')?.addEventListener('click', submitQuiz);
+  }
+
+  async function submitQuiz() {
+    if (!currentQuizId || !quizOutput || quizSubmitted) return;
+
+    const answers = currentQuizQuestions.map((_q, index) =>
+      quizSelectedAnswers.has(index) ? quizSelectedAnswers.get(index)! : -1,
+    );
+
+    const submitBtn = document.getElementById('quiz-submit') as HTMLButtonElement | null;
+    if (submitBtn) submitBtn.disabled = true;
+    setQuizStatus('Submitting...', 'warning');
+
+    try {
+      const resp = await apiFetch(`/chats/quiz/${currentQuizId}/submit?user_id=${user.id}`, {
+        method: 'POST',
+        body: JSON.stringify({ answers }),
+        timeoutMs: 60_000,
+      });
+
+      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
+      const result = await resp.json();
+      quizSubmitted = true;
+      renderQuizResults(result);
+      setQuizStatus(`Score: ${result.score}/${result.total_questions}`, 'success');
+    } catch (err: any) {
+      console.error('Quiz submit error:', err);
+      setQuizStatus('Submission failed: ' + (err?.message || err), 'danger');
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  function renderQuizResults(result: any) {
+    if (!quizOutput) return;
+    const results = result.results || [];
+
+    quizOutput.innerHTML = `
+      <div class="quiz-score-banner" data-tone="${result.score === result.total_questions ? 'success' : 'warning'}">
+        <strong>${result.score}/${result.total_questions}</strong>
+        <span>correct</span>
+      </div>
+      <div class="quiz-grid">
+        ${results
+          .map((r: any, index: number) => {
+            const options = (r.options || [])
+              .map((option: string, optIndex: number) => {
+                const letter = String.fromCharCode(65 + optIndex);
+                let cls = 'quiz-option quiz-option-readonly';
+                if (optIndex === r.correct_index) cls += ' quiz-option-correct';
+                else if (optIndex === r.selected_index) cls += ' quiz-option-incorrect';
+                return `
+                  <div class="${cls}">
+                    <span class="quiz-option-letter">${letter}</span>
+                    <span class="quiz-option-text">${escapeHtml(option)}</span>
+                  </div>
+                `;
+              })
+              .join('');
+
+            return `
+              <article class="quiz-question-card" data-tone="${r.is_correct ? 'success' : 'danger'}">
+                <p class="quiz-question-text"><span class="quiz-question-number">Q${index + 1}.</span> ${escapeHtml(r.question || '')}</p>
+                <div class="quiz-options">${options}</div>
+                ${r.explanation ? `<p class="quiz-explanation">${escapeHtml(r.explanation)}</p>` : ''}
+              </article>
+            `;
+          })
+          .join('')}
+      </div>
+    `;
+  }
+
+  function restoreQuizFromCache(chatId: number) {
+    if (!quizOutput) return false;
+    const cached = readChatCache('quiz', chatId);
+    if (!cached?.questions?.length) return false;
+    currentQuizId = cached.quizId;
+    currentQuizQuestions = cached.questions;
+    quizSubmitted = false;
+    quizSelectedAnswers.clear();
+    renderQuiz(currentQuizQuestions);
+    if (quizQuestionCount && cached.numQuestions) quizQuestionCount.value = String(cached.numQuestions);
+    setQuizStatus('Previously generated quiz restored', 'success');
+    return true;
+  }
+
+  function clearQuiz() {
+    currentQuizId = null;
+    currentQuizQuestions = [];
+    quizSelectedAnswers.clear();
+    quizSubmitted = false;
+    if (quizOutput) quizOutput.innerHTML = '<p class="empty">Generate a quiz to test your knowledge.</p>';
+    setQuizStatus('');
   }
 
   function setSelectedUpload(file: File) {
@@ -1320,6 +1544,8 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
 
   flashcardGenerateBtn?.addEventListener('click', generateFlashcards);
   flashcardClearBtn?.addEventListener('click', clearFlashcards);
+  quizGenerateBtn?.addEventListener('click', generateQuiz);
+  quizClearBtn?.addEventListener('click', clearQuiz);
 
   logoutBtn?.addEventListener('click', () => {
     ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));
@@ -1332,6 +1558,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     const hasChat = Boolean(selectedChatId);
     if (summarizerBtn) (summarizerBtn as HTMLElement).style.display = hasChat ? '' : 'none';
     if (flashcardBtn) (flashcardBtn as HTMLElement).style.display = hasChat ? '' : 'none';
+    if (quizBtn) (quizBtn as HTMLElement).style.display = hasChat ? '' : 'none';
     updateNavActive();
   }
 
@@ -1345,12 +1572,15 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     set(navChatBtn, currentView === 'chat');
     set(summarizerBtn, currentView === 'summarizer');
     set(flashcardBtn, currentView === 'flashcard');
+    set(quizBtn, currentView === 'quiz');
   }
 
   const summaryPanel = document.getElementById('summary-panel-container');
   const flashcardPanel = document.getElementById('flashcard-panel-container');
+  const quizPanel = document.getElementById('quiz-panel-container');
   const summaryClose = document.getElementById('summary-close');
   const flashcardClose = document.getElementById('flashcard-close');
+  const quizClose = document.getElementById('quiz-close');
 
   const mobileOverlayChats = document.querySelector('.mobile-overlay-chats') as HTMLElement | null;
 
@@ -1359,6 +1589,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     if (messageStream) messageStream.style.display = 'none';
     summaryPanel.hidden = false;
     if (flashcardPanel) flashcardPanel.hidden = true;
+    if (quizPanel) quizPanel.hidden = true;
     currentView = 'summarizer';
     updateNavActive();
     setComposerMode('upload');
@@ -1370,7 +1601,20 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     if (messageStream) messageStream.style.display = 'none';
     flashcardPanel.hidden = false;
     if (summaryPanel) summaryPanel.hidden = true;
+    if (quizPanel) quizPanel.hidden = true;
     currentView = 'flashcard';
+    updateNavActive();
+    setComposerMode('upload');
+    if (mobileOverlayChats) mobileOverlayChats.style.display = 'none';
+  }
+
+  function showQuizPanel() {
+    if (!quizPanel) return;
+    if (messageStream) messageStream.style.display = 'none';
+    quizPanel.hidden = false;
+    if (summaryPanel) summaryPanel.hidden = true;
+    if (flashcardPanel) flashcardPanel.hidden = true;
+    currentView = 'quiz';
     updateNavActive();
     setComposerMode('upload');
     if (mobileOverlayChats) mobileOverlayChats.style.display = 'none';
@@ -1379,6 +1623,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
   function closePanels() {
     if (summaryPanel) summaryPanel.hidden = true;
     if (flashcardPanel) flashcardPanel.hidden = true;
+    if (quizPanel) quizPanel.hidden = true;
     if (messageStream) messageStream.style.display = '';
     currentView = 'chat';
     updateNavActive();
@@ -1400,8 +1645,10 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
 
   summarizerBtn?.addEventListener('click', () => { showSummaryPanel(); });
   flashcardBtn?.addEventListener('click', () => { showFlashcardPanel(); });
+  quizBtn?.addEventListener('click', () => { showQuizPanel(); });
   summaryClose?.addEventListener('click', () => { closePanels(); });
   flashcardClose?.addEventListener('click', () => { closePanels(); });
+  quizClose?.addEventListener('click', () => { closePanels(); });
   navChatBtn?.addEventListener('click', () => { closePanels(); });
 
   profileMenuToggle?.addEventListener('click', (e: any) => {

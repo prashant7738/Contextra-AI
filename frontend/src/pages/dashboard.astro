@@ -22,6 +22,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
           <button id="nav-chat-btn" class="nav-tab nav-tab-active" type="button">Chat</button>
           <button id="summarizer-btn" class="nav-tab" type="button" style="display:none">Summarizer</button>
           <button id="flashcard-btn" class="nav-tab" type="button" style="display:none">Flashcards</button>
+          <button id="quiz-btn" class="nav-tab" type="button" style="display:none">Quiz</button>
         </nav>
 
         <div class="topbar-actions">
@@ -51,6 +52,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
             <div id="mobile-profile-menu" class="mobile-profile-menu" hidden>
               <button id="mobile-summarizer" class="button button-ghost" type="button">Summarizer</button>
               <button id="mobile-flashcard" class="button button-ghost" type="button">Flashcards</button>
+              <button id="mobile-quiz" class="button button-ghost" type="button">Quiz</button>
               <button id="mobile-logout" class="button button-ghost" type="button">Logout</button>
             </div>
           </div>
@@ -204,6 +206,43 @@ import ThemeToggle from '../components/ThemeToggle.astro';
             </div>
           </div>
 
+          <!-- Quiz panel (replaces chat view when activated) -->
+          <div id="quiz-panel-container" class="panel" hidden>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)">
+              <div>
+                <p class="eyebrow">Practice Layer</p>
+                <h3>Quiz</h3>
+                <p class="quiz-copy">Test yourself with multiple-choice questions generated from the selected chat.</p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span id="quiz-chat-pill" class="pill">No chat selected</span>
+                <button id="quiz-close" class="button button-ghost" type="button">Back</button>
+              </div>
+            </div>
+            <div style="padding:18px">
+              <div class="summary-controls">
+                <label class="field">
+                  <span>Number of questions</span>
+                  <select id="quiz-question-count">
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <div class="summary-actions">
+                  <button id="quiz-generate" class="button button-primary" type="button">Generate</button>
+                  <button id="quiz-clear" class="button button-ghost" type="button">Clear</button>
+                </div>
+              </div>
+
+              <p id="quiz-status" class="status-line quiz-status" style="margin-top:12px"></p>
+              <div id="quiz-output" class="quiz-output" style="margin-top:12px">
+                <p class="empty">Generate a quiz to test your knowledge.</p>
+              </div>
+            </div>
+          </div>
+
           <div id="composer" class="composer" hidden>
             <div id="composer-upload" class="composer-upload" hidden>
               <label class="dropzone" id="dropzone-label" for="file-input">
@@ -262,6 +301,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
           <button id="overlay-chat" class="button button-ghost" type="button">Chat</button>
           <button id="overlay-summarizer" class="button button-ghost" type="button">Summarizer</button>
           <button id="overlay-flashcard" class="button button-ghost" type="button">Flashcards</button>
+          <button id="overlay-quiz" class="button button-ghost" type="button">Quiz</button>
           <button id="overlay-logout" class="button button-ghost" type="button">Logout</button>
         </div>
         <div class="mobile-overlay-chats">
