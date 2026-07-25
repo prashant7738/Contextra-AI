@@ -11,6 +11,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
   <script>
     import { apiClient } from '../../utils/api';
+    import { escapeHtml } from '../../utils/escapeHtml';
 
     interface AdminChat { id: number; name: string }
 
@@ -37,7 +38,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const res = await apiClient.get<AdminChat[]>(`/admin/users/${userId}/chats`);
       loadingEl.style.display = 'none';
       if (res.error) {
-        chatsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${res.error}</li>`;
+        chatsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${escapeHtml(res.error)}</li>`;
         return;
       }
       const chats = res.data ?? [];
@@ -50,7 +51,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         .map(
           (c) => `
         <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
-          <div style="font-weight:600">${c.name}</div>
+          <div style="font-weight:600">${escapeHtml(c.name)}</div>
           <a href="/admin/chat-messages?id=${c.id}">View messages</a>
         </li>`
         )

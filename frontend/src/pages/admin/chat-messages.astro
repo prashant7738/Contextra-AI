@@ -11,6 +11,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
   <script>
     import { apiClient } from '../../utils/api';
+    import { escapeHtml } from '../../utils/escapeHtml';
 
     interface AdminMessage {
       user_id: number;
@@ -42,7 +43,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const res = await apiClient.get<AdminMessage[]>(`/admin/chats/${chatId}/messages`);
       loadingEl.style.display = 'none';
       if (res.error) {
-        msgsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${res.error}</li>`;
+        msgsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${escapeHtml(res.error)}</li>`;
         return;
       }
       const msgs = res.data ?? [];
@@ -56,8 +57,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           (m) => `
         <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
           <div style="font-weight:600">User: ${m.user_id}</div>
-          <div style="color:#333;margin-top:6px">${m.user_message}</div>
-          <div style="color:#0b66ff;margin-top:8px">Bot: ${m.bot_response}</div>
+          <div style="color:#333;margin-top:6px">${escapeHtml(m.user_message)}</div>
+          <div style="color:#0b66ff;margin-top:8px">Bot: ${escapeHtml(m.bot_response)}</div>
           <div style="font-size:12px;color:#7b8997;margin-top:6px">${new Date(m.created_at).toLocaleString()}</div>
         </li>`
         )

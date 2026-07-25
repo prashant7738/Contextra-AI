@@ -31,6 +31,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   <script>
     import { apiClient } from '../utils/api';
+    import { escapeHtml } from '../utils/escapeHtml';
 
     interface AdminUser { id: number; name: string; email: string; token_limit: number; tokens_used: number }
 
@@ -39,13 +40,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     function renderUserCard(u: AdminUser) {
       const remaining = Math.max(u.token_limit - u.tokens_used, 0);
+      const safeName = escapeHtml(u.name);
+      const safeEmail = escapeHtml(u.email);
       return `
         <li class="user-card" data-user-id="${u.id}">
-          <h3>${u.name}</h3>
-          <p>${u.email}</p>
+          <h3>${safeName}</h3>
+          <p>${safeEmail}</p>
           <p class="small">Used ${u.tokens_used.toLocaleString()} of ${u.token_limit.toLocaleString()} tokens</p>
           <div class="quota-row">
-            <input type="number" min="1000" step="100" value="${u.token_limit}" aria-label="Token limit for ${u.email}" />
+            <input type="number" min="1000" step="100" value="${u.token_limit}" aria-label="Token limit for ${safeEmail}" />
             <button type="button">Save</button>
           </div>
           <div class="status">Remaining: ${remaining.toLocaleString()}</div>
@@ -93,7 +96,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       const res = await apiClient.get<AdminUser[]>('/admin/users');
       loadingEl.style.display = 'none';
       if (res.error) {
-        usersEl.innerHTML = `<li class="user-card">Error: ${res.error}</li>`;
+        usersEl.innerHTML = `<li class="user-card">Error: ${escapeHtml(res.error)}</li>`;
         return;
       }
       const users = res.data ?? [];
