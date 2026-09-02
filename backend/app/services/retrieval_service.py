@@ -31,14 +31,15 @@ async def _retrieve_context(
     references: list[dict] = []
     seen = set()
 
-    for query in queries:
-        normalized_query = query.strip()
-        if not normalized_query:
-            continue
+    valid_queries = [query.strip() for query in queries if query.strip()]
 
-        query_embedding = (await asyncio.to_thread(embed_texts, [normalized_query]))[0]
-        results = await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
+    async def retrieve_query(query: str) -> dict:
+        query_embedding = (await asyncio.to_thread(embed_texts, [query]))[0]
+        return await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
 
+    query_results = await asyncio.gather(*(retrieve_query(query) for query in valid_queries))
+
+    for results in query_results:
         for document, metadata in zip(results.get("documents", [[]])[0], results.get("metadatas", [[]])[0]):
             cleaned_document = str(document).strip()
             if not cleaned_document:

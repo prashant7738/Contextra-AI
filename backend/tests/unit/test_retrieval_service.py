@@ -1,6 +1,39 @@
 import asyncio
+import threading
 
 from app.services import retrieval_service
+
+
+def test_retrieve_context_runs_query_retrieval_concurrently(monkeypatch):
+    started = threading.Barrier(2)
+
+    def fake_embed_texts(texts):
+        started.wait(timeout=1)
+        return [[texts[0]]]
+
+    def fake_query_similar(query_embedding, n_results, user_id, chat_id):
+        return {
+            "documents": [[f"Context for {query_embedding[0]}"]],
+            "metadatas": [[{"filename": "notes.pdf", "page": 1, "document_id": 1}]],
+        }
+
+    monkeypatch.setattr(retrieval_service, "embed_texts", fake_embed_texts)
+    monkeypatch.setattr(retrieval_service, "query_similar", fake_query_similar)
+
+    documents, references = asyncio.run(
+        retrieval_service._retrieve_context(
+            queries=["question", retrieval_service.BROAD_FALLBACK_QUERY],
+            user_id=1,
+            chat_id=1,
+            n_results=2,
+        )
+    )
+
+    assert documents == [
+        "Context for question",
+        f"Context for {retrieval_service.BROAD_FALLBACK_QUERY}",
+    ]
+    assert len(references) == 2
 
 
 def test_answer_query_merges_specific_and_broad_retrieval_context(monkeypatch):
