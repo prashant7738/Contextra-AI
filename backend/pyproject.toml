@@ -10,6 +10,7 @@ dependencies = [
     "bcrypt==4.0.1",
     "easyocr>=1.7.0",
     "fastapi>=0.136.1",
+    "google-genai>=2.21.0",
     "huggingface-hub>=1.15.0",
     "numpy>=2.4.6",
     "passlib[bcrypt]>=1.7.4",

@@ -1,28 +1,66 @@
 import asyncio
+import logging
+
+from google import genai
+from google.genai import types
 from huggingface_hub import InferenceClient
 
 from app.settings import settings
 
+logger = logging.getLogger(__name__)
 
-_chat_client: InferenceClient | None = None
+GEMINI_MODEL = "gemini-3.7-flash"
+
+_gemini_client: genai.Client | None = None
+_fallback_client: InferenceClient | None = None
 
 
-def get_llm() -> InferenceClient:
-    global _chat_client
-    if _chat_client is None:
+def get_gemini_client() -> genai.Client:
+    """Primary LLM client; reads GEMINI_API_KEY/GOOGLE_API_KEY from the environment."""
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client()
+    return _gemini_client
+
+
+def get_fallback_llm() -> InferenceClient:
+    global _fallback_client
+    if _fallback_client is None:
         if not settings.hf_token:
             raise RuntimeError("Hugging Face API token not set. Set `HF_TOKEN` in environment or .env as `hf_token`.")
-        _chat_client = InferenceClient(
+        _fallback_client = InferenceClient(
             model="meta-llama/Llama-3.1-8B-Instruct",
             api_key=settings.hf_token,
         )
-    return _chat_client
+    return _fallback_client
 
 
-def _ask_llm_sync(context: str, question: str, max_tokens: int = 800) -> str:
-    """Synchronous LLM call - runs in thread pool."""
-    client = get_llm()
-    prompt = f"""
+def _generate_text(prompt: str, max_tokens: int, temperature: float) -> str:
+    """Try Gemini first; on any failure, fall back to the HuggingFace client."""
+    try:
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=max_tokens,
+                temperature=temperature,
+            ),
+        )
+        return response.text
+    except Exception:
+        logger.warning("Gemini call failed, falling back to HuggingFace", exc_info=True)
+        client = get_fallback_llm()
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return response.choices[0].message.content
+
+
+def _build_chat_prompt(context: str, question: str) -> str:
+    return f"""
 You are a helpful assistant.
 Use the following context to answer the question by synthesizing all relevant excerpts.
 Do not say you don't know just because the wording is different or the answer must be combined from multiple chunks.
@@ -34,12 +72,12 @@ Context:
 
 Question: {question}
 """
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0.1,
-    )
-    return response.choices[0].message.content
+
+
+def _ask_llm_sync(context: str, question: str, max_tokens: int = 800) -> str:
+    """Synchronous LLM call - runs in thread pool."""
+    prompt = _build_chat_prompt(context, question)
+    return _generate_text(prompt, max_tokens, temperature=0.1)
 
 
 async def ask_llm(context: str, question: str, max_tokens: int = 800) -> str:
@@ -47,13 +85,8 @@ async def ask_llm(context: str, question: str, max_tokens: int = 800) -> str:
     return await asyncio.to_thread(_ask_llm_sync, context, question, max_tokens)
 
 
-
-
-
-def _ask_detailed_summary_llm_sync(context: str, topic_name: str, max_tokens: int = 700) -> str:
-    """Synchronous detailed summary - runs in thread pool."""
-    client = get_llm()
-    prompt = f"""
+def _build_detailed_summary_prompt(context: str, topic_name: str) -> str:
+    return f"""
 You are an expert study assistant.
 Create an 80/20 summary from the provided notes.
 
@@ -93,12 +126,12 @@ Output format:
 Context:
 {context}
 """
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0.1,
-    )
-    return response.choices[0].message.content
+
+
+def _ask_detailed_summary_llm_sync(context: str, topic_name: str, max_tokens: int = 700) -> str:
+    """Synchronous detailed summary - runs in thread pool."""
+    prompt = _build_detailed_summary_prompt(context, topic_name)
+    return _generate_text(prompt, max_tokens, temperature=0.1)
 
 
 async def ask_detailed_summary_llm(context: str, topic_name: str, max_tokens: int = 700) -> str:
@@ -106,10 +139,8 @@ async def ask_detailed_summary_llm(context: str, topic_name: str, max_tokens: in
     return await asyncio.to_thread(_ask_detailed_summary_llm_sync, context, topic_name, max_tokens)
 
 
-def _generate_flashcards_llm_sync(context: str, max_tokens: int = 1000) -> str:
-    """Synchronous flashcard generation - runs in thread pool."""
-    client = get_llm()
-    prompt = f"""Generate learning flashcards from the content below.
+def _build_flashcards_prompt(context: str) -> str:
+    return f"""Generate learning flashcards from the content below.
 
 Output constraints (strict):
 - Do NOT return JSON.
@@ -130,12 +161,12 @@ Rules:
 Content:
 {context}
 """
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0.2,
-    )
-    return response.choices[0].message.content
+
+
+def _generate_flashcards_llm_sync(context: str, max_tokens: int = 1000) -> str:
+    """Synchronous flashcard generation - runs in thread pool."""
+    prompt = _build_flashcards_prompt(context)
+    return _generate_text(prompt, max_tokens, temperature=0.2)
 
 
 async def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
@@ -143,10 +174,8 @@ async def generate_flashcards_llm(context: str, max_tokens: int = 1000) -> str:
     return await asyncio.to_thread(_generate_flashcards_llm_sync, context, max_tokens)
 
 
-def _generate_quiz_llm_sync(context: str, num_questions: int, max_tokens: int = 1500) -> str:
-    """Synchronous MCQ quiz generation - runs in thread pool."""
-    client = get_llm()
-    prompt = f"""Generate exactly {num_questions} multiple-choice quiz questions from the content below.
+def _build_quiz_prompt(context: str, num_questions: int) -> str:
+    return f"""Generate exactly {num_questions} multiple-choice quiz questions from the content below.
 
 Output constraints (strict):
 - Do NOT return JSON.
@@ -172,12 +201,12 @@ Rules:
 Content:
 {context}
 """
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0.2,
-    )
-    return response.choices[0].message.content
+
+
+def _generate_quiz_llm_sync(context: str, num_questions: int, max_tokens: int = 1500) -> str:
+    """Synchronous MCQ quiz generation - runs in thread pool."""
+    prompt = _build_quiz_prompt(context, num_questions)
+    return _generate_text(prompt, max_tokens, temperature=0.2)
 
 
 async def generate_quiz_llm(context: str, num_questions: int, max_tokens: int = 1500) -> str:

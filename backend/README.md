@@ -7,7 +7,8 @@ Configure via `.env` file:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string (e.g. `postgresql+psycopg2://user:pass@localhost:5432/contextra`) |
-| `HF_TOKEN` | Yes | — | Hugging Face API token for LLM & embeddings |
+| `GEMINI_API_KEY` | No | — | Primary LLM provider (Gemini). Falls back to `HF_TOKEN` (HuggingFace) if unset or on error |
+| `HF_TOKEN` | Yes | — | Hugging Face API token for embeddings, and fallback LLM if Gemini is unavailable |
 | `SECRET_KEY` | Yes | — | JWT signing secret |
 | `ADMIN_EMAIL` | No | — | Email of the admin user (admin endpoints require this) |
 | `CRON_SECRET` | No | — | Secret for `/cron/run` endpoint |
@@ -236,7 +237,7 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 2. Embeds the question
 3. Finds top-10 similar chunks from the chat
 4. Includes previous conversation context (last 10 messages)
-5. Passes context to Llama 3.1 8B
+5. Passes context to Gemini (falls back to Llama 3.1 8B on error)
 6. Saves message & response to history
 7. Returns answer, references, and conversation history
 8. Deducts tokens from user's monthly budget
@@ -587,7 +588,7 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 2. Query & Chat
    └─> Embed question → Find top-10 similar chunks (pgvector cosine search)
        → Include last 10 messages as conversation context
-       → Pass to Llama 3.1 8B → Return answer + references + history
+       → Pass to Gemini (falls back to Llama 3.1 8B) → Return answer + references + history
        → Deduct tokens from user's monthly budget
 
 3. Detailed Summarization (80/20)
@@ -614,7 +615,7 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 - **Database**: PostgreSQL + pgvector (vector extension)
 - **Embedding Model**: BAAI/bge-small-en-v1.5 (384-dim, local via sentence-transformers)
 - **Embedding Providers**: local (default), OpenAI (text-embedding-3-small), HuggingFace Inference API
-- **LLM**: meta-llama/Llama-3.1-8B-Instruct (via HuggingFace Inference API)
+- **LLM**: Gemini (`gemini-3.7-flash`), falling back to meta-llama/Llama-3.1-8B-Instruct (via HuggingFace Inference API) on error
 - **PDF Extraction**: PyMuPDF (text) + EasyOCR (scanned page fallback)
 - **ORM**: SQLAlchemy 2.0
 - **Migrations**: Alembic
