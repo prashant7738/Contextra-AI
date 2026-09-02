@@ -57,6 +57,10 @@ const {
   <body class={bodyClass} id={bodyId}>
     <a href="#main" class="skip-link">Skip to main content</a>
     <slot />
+    <script>
+      import { startKeepAlive } from '../scripts/keep-alive';
+      startKeepAlive();
+    </script>
   </body>
 </html>
 
