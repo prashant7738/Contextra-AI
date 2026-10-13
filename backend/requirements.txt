@@ -1,3 +1,7 @@
+# CPU-only PyTorch (needed by easyocr). The default Linux wheel bundles ~4GB of unused CUDA libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
 alembic>=1.18.4
 asyncpg>=0.29.0
 bcrypt==4.0.1
