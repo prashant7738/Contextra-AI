@@ -1916,6 +1916,10 @@ textarea {
     0 30px 60px rgba(18, 22, 20, 0.2);
 }
 
+#quiz-panel-container[hidden] {
+  display: none;
+}
+
 .quiz-copy {
   margin: 12px 0 0;
   max-width: 44ch;
