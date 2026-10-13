@@ -12,13 +12,16 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.core.embeddings import EMBEDDING_MODEL, embed_texts
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
+from app.models.daily_spend import DailySpend
 from app.models.embedding import Embedding
 
 BATCH_SIZE = 100
 
 
 def main() -> None:
+    # The budget ledger table is normally created by the app on startup.
+    DailySpend.__table__.create(bind=engine, checkfirst=True)
     migrated = 0
     db = SessionLocal()
     try:
