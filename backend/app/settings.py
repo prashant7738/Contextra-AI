@@ -1,4 +1,4 @@
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 MIN_SECRET_KEY_LENGTH = 32
@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     default_user_token_limit: int = 25000
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @field_validator("database_url")
+    @classmethod
+    def _pin_postgres_driver(cls, value: str) -> str:
+        """SQLAlchemy 2.1 defaults `postgresql://` to psycopg v3, but we install psycopg2."""
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg2://" + value[len(prefix):]
+        return value
 
     @model_validator(mode="after")
     def _validate_secret_key(self) -> "Settings":
