@@ -31,7 +31,6 @@ def test_answer_query_prefers_filename_specific_context(monkeypatch):
     monkeypatch.setattr(retrieval_service, 'embed_texts', fake_embed_texts)
     monkeypatch.setattr(retrieval_service, 'query_similar', fake_query_similar)
     monkeypatch.setattr(retrieval_service, 'ask_llm', fake_ask_llm)
-    monkeypatch.setattr(retrieval_service, 'consume_user_tokens', lambda *args, **kwargs: None)
 
     answer, references = asyncio.run(
         retrieval_service.answer_query(

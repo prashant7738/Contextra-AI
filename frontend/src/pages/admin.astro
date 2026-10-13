@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <BaseLayout title="Admin – Contextra AI" requireAuth>
   <main class="admin-root" id="main">
     <h1 class="title">Admin Panel</h1>
-    <p class="subtitle">User list, token caps, and chat inspection (admin only)</p>
+    <p class="subtitle">User list, monthly AI budgets, and chat inspection (admin only)</p>
 
     <section id="content">
       <div id="loading">Loading users…</div>
@@ -33,25 +33,27 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     import { apiClient } from '../utils/api';
     import { escapeHtml } from '../utils/escapeHtml';
 
-    interface AdminUser { id: number; name: string; email: string; token_limit: number; tokens_used: number }
+    interface AdminUser { id: number; name: string; email: string; budget_usd: number; spent_usd: number }
 
     const usersEl = document.getElementById('users') as HTMLUListElement | null;
     const loadingEl = document.getElementById('loading') as HTMLElement | null;
 
+    const usd = (value: number) => `$${value.toFixed(2)}`;
+
     function renderUserCard(u: AdminUser) {
-      const remaining = Math.max(u.token_limit - u.tokens_used, 0);
+      const remaining = Math.max(u.budget_usd - u.spent_usd, 0);
       const safeName = escapeHtml(u.name);
       const safeEmail = escapeHtml(u.email);
       return `
         <li class="user-card" data-user-id="${u.id}">
           <h3>${safeName}</h3>
           <p>${safeEmail}</p>
-          <p class="small">Used ${u.tokens_used.toLocaleString()} of ${u.token_limit.toLocaleString()} tokens</p>
+          <p class="small">Spent ${usd(u.spent_usd)} of ${usd(u.budget_usd)} this month</p>
           <div class="quota-row">
-            <input type="number" min="1000" step="100" value="${u.token_limit}" aria-label="Token limit for ${safeEmail}" />
+            <input type="number" min="0" max="1000" step="0.25" value="${u.budget_usd}" aria-label="Monthly budget in USD for ${safeEmail}" />
             <button type="button">Save</button>
           </div>
-          <div class="status">Remaining: ${remaining.toLocaleString()}</div>
+          <div class="status">Remaining: ${usd(remaining)}</div>
           <a class="chats-link" href="/admin/user-chats?id=${u.id}">View chats</a>
         </li>`;
     }
@@ -67,25 +69,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         if (!input || !button || !status || Number.isNaN(userId)) continue;
 
         button.addEventListener('click', async () => {
-          const tokenLimit = Number(input.value);
-          if (!Number.isFinite(tokenLimit) || tokenLimit < 1000) {
-            status.textContent = 'Enter a limit of at least 1000 tokens.';
+          const budget = Number(input.value);
+          if (!Number.isFinite(budget) || budget < 0 || budget > 1000) {
+            status.textContent = 'Enter a monthly budget between $0 and $1000.';
             return;
           }
 
           button.disabled = true;
           status.textContent = 'Saving...';
-          const res = await apiClient.patch<AdminUser>(`/admin/users/${userId}/token-limit`, { token_limit: tokenLimit });
+          const res = await apiClient.patch<AdminUser>(`/admin/users/${userId}/budget`, { budget_usd: budget });
           button.disabled = false;
 
           if (res.error || !res.data) {
-            status.textContent = `Error: ${res.error ?? 'Unable to update limit'}`;
+            status.textContent = `Error: ${res.error ?? 'Unable to update budget'}`;
             return;
           }
 
           const updated = res.data;
-          input.value = String(updated.token_limit);
-          status.textContent = `Remaining: ${Math.max(updated.token_limit - updated.tokens_used, 0).toLocaleString()}`;
+          input.value = String(updated.budget_usd);
+          status.textContent = `Remaining: ${usd(Math.max(updated.budget_usd - updated.spent_usd, 0))}`;
         });
       }
     }

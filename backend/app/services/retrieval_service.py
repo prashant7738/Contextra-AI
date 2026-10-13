@@ -10,7 +10,7 @@ from app.services.quiz_parsing import (
     parse_quiz_json_fallback,
     parse_quiz_marker_output,
 )
-from app.services.token_budget_service import consume_user_tokens, estimate_token_cost
+from app.services.spend_budget_service import charge_to_user
 import json
 import re
 from sqlalchemy.orm import Session
@@ -37,7 +37,8 @@ async def _retrieve_context(
     valid_queries = [query.strip() for query in queries if query.strip()]
 
     async def retrieve_query(query: str) -> dict:
-        query_embedding = (await asyncio.to_thread(embed_texts, [query]))[0]
+        with charge_to_user(user_id):
+            query_embedding = (await asyncio.to_thread(embed_texts, [query]))[0]
         return await asyncio.to_thread(query_similar, query_embedding, n_results, user_id, chat_id)
 
     query_results = await asyncio.gather(*(retrieve_query(query) for query in valid_queries))
@@ -118,8 +119,8 @@ async def answer_query(
     
     # Combine contexts: history + document context
     full_context = context + history_context
-    consume_user_tokens(db, user_id, estimate_token_cost(full_context, question, max_tokens=max_tokens))
-    return await ask_llm(full_context, question, max_tokens=max_tokens), references
+    with charge_to_user(user_id):
+        return await ask_llm(full_context, question, max_tokens=max_tokens), references
 
 
 def _format_context_with_references(docs: list[str], references: list[dict]) -> str:
@@ -218,8 +219,8 @@ async def generate_detailed_summary(
     else:
         full_context = context
     
-    consume_user_tokens(db, user_id, estimate_token_cost(full_context, normalized_topic, max_tokens=max_tokens))
-    summary_output = await ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
+    with charge_to_user(user_id):
+        summary_output = await ask_detailed_summary_llm(full_context, normalized_topic, max_tokens=max_tokens)
     summary, title, sections = _parse_detailed_summary_output(summary_output, normalized_topic)
     return summary, title, sections, references, len(docs)
 
@@ -397,8 +398,8 @@ async def generate_flashcards(
     context = "\n\n".join(docs)
     
     # Step 2: Generate flashcards using LLM
-    consume_user_tokens(db, user_id, estimate_token_cost(context, max_tokens=max_tokens))
-    flashcards_output = await generate_flashcards_llm(context, max_tokens=max_tokens)
+    with charge_to_user(user_id):
+        flashcards_output = await generate_flashcards_llm(context, max_tokens=max_tokens)
     
     # Step 3: Parse response in marker format first, then JSON as fallback
     cleaned_flashcards = parse_flashcard_marker_output(flashcards_output)
@@ -479,8 +480,8 @@ async def generate_quiz(
 
     context = "\n\n".join(docs)
 
-    consume_user_tokens(db, user_id, estimate_token_cost(context, max_tokens=max_tokens))
-    quiz_output = await generate_quiz_llm(context, num_questions=num_questions, max_tokens=max_tokens)
+    with charge_to_user(user_id):
+        quiz_output = await generate_quiz_llm(context, num_questions=num_questions, max_tokens=max_tokens)
 
     questions = parse_quiz_marker_output(quiz_output)
     if not questions:

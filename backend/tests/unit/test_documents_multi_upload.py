@@ -45,7 +45,7 @@ def test_direct_ingest_creates_a_task_for_each_uploaded_file(monkeypatch):
         from app.dependencies import get_current_user
         from app.schemas.user import UserResponse
 
-        app.dependency_overrides[get_current_user] = lambda: UserResponse(id=user.id, name=user.name, email=user.email, token_limit=user.token_limit, tokens_used=user.tokens_used)
+        app.dependency_overrides[get_current_user] = lambda: UserResponse(id=user.id, name=user.name, email=user.email, budget_usd=1.0, spent_usd=0.0)
 
         created_tasks = []
 

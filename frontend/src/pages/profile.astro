@@ -72,7 +72,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
               <span id="pf-email" class="profile-field-value">—</span>
             </div>
             <div class="profile-field">
-              <span class="profile-field-label">Tokens</span>
+              <span class="profile-field-label">Monthly AI budget</span>
               <span id="pf-tokens" class="profile-field-value">—</span>
             </div>
           </div>
@@ -218,8 +218,10 @@ import ThemeToggle from '../components/ThemeToggle.astro';
     </style>
 
     <script>
+      import { apiClient } from '../utils/api';
+
       (function () {
-        let user: { name?: string; email?: string; id?: number | string; token_limit?: number; tokens_used?: number } | null = null;
+        let user: { name?: string; email?: string; id?: number | string; budget_usd?: number; spent_usd?: number } | null = null;
         try {
           const userJson = localStorage.getItem('current_user');
           if (userJson) user = JSON.parse(userJson);
@@ -246,10 +248,20 @@ import ThemeToggle from '../components/ThemeToggle.astro';
         setText('pf-name', fullName);
         setText('pf-email', email);
 
-        const tokenLimit = user.token_limit ?? 0;
-        const tokensUsed = user.tokens_used ?? 0;
-        const remaining = Math.max(tokenLimit - tokensUsed, 0);
-        setText('pf-tokens', `${remaining.toLocaleString()} / ${tokenLimit.toLocaleString()}`);
+        const renderBudget = (budget?: number, spent?: number) => {
+          const limit = budget ?? 0;
+          const remaining = Math.max(limit - (spent ?? 0), 0);
+          setText('pf-tokens', `$${remaining.toFixed(2)} left of $${limit.toFixed(2)}`);
+        };
+        renderBudget(user.budget_usd, user.spent_usd);
+
+        // Cached login data can be stale; refresh spend from the API.
+        apiClient.getMe().then((res) => {
+          const fresh = res.data as { budget_usd?: number; spent_usd?: number } | undefined;
+          if (!fresh) return;
+          renderBudget(fresh.budget_usd, fresh.spent_usd);
+          localStorage.setItem('current_user', JSON.stringify({ ...user, ...fresh }));
+        });
 
         document.getElementById('profile-logout-btn')?.addEventListener('click', () => {
           ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));

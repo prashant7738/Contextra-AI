@@ -11,8 +11,8 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  token_limit: number;
-  tokens_used: number;
+  budget_usd?: number;
+  spent_usd?: number;
 }
 
 export interface AuthTokens {
@@ -77,13 +77,7 @@ export const AuthService = {
     if (typeof window === 'undefined') return null;
     const user = safeJsonParse<User | null>(localStorage.getItem(USER_KEY), null);
     // Light shape check so we don't trust completely arbitrary stored payloads.
-    if (
-      user &&
-      typeof user.id === 'number' &&
-      typeof user.email === 'string' &&
-      typeof user.token_limit === 'number' &&
-      typeof user.tokens_used === 'number'
-    ) {
+    if (user && typeof user.id === 'number' && typeof user.email === 'string') {
       return user;
     }
     return null;

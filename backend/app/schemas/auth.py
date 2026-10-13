@@ -26,8 +26,8 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: str
-    token_limit: int
-    tokens_used: int
+    budget_usd: float
+    spent_usd: float
 
     model_config = {"from_attributes": True}
 

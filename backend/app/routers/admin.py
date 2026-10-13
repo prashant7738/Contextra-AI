@@ -18,8 +18,8 @@ from app.schemas.chat import ChatResponse, ChatMessageResponse
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-class UserTokenLimitUpdate(BaseModel):
-    token_limit: int = Field(default=25000, ge=1000, le=1_000_000)
+class UserBudgetUpdate(BaseModel):
+    budget_usd: float = Field(..., ge=0, le=1000)
 
 
 def _ensure_admin(current_user: UserResponse):
@@ -45,15 +45,15 @@ def admin_list_users(
     return [UserResponse.model_validate(u) for u in users]
 
 
-@router.patch("/users/{user_id}/token-limit", response_model=UserResponse)
-def admin_update_user_token_limit(
+@router.patch("/users/{user_id}/budget", response_model=UserResponse)
+def admin_update_user_budget(
     user_id: int,
-    payload: UserTokenLimitUpdate,
+    payload: UserBudgetUpdate,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     _ensure_admin(current_user)
-    user = user_repository.update_user_token_limit(db, user_id, payload.token_limit)
+    user = user_repository.update_user_budget(db, user_id, payload.budget_usd)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserResponse.model_validate(user)

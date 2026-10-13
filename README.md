@@ -60,7 +60,7 @@ npm run dev
 
 **Required:** `DATABASE_URL`, `OPENAI_API_KEY`, `SECRET_KEY`, `ADMIN_EMAIL`, `CRON_SECRET`
 
-**Optional:** `DAILY_BUDGET_USD` (global AI spend cap per UTC day, default `0.25`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEFAULT_USER_TOKEN_LIMIT`
+**Optional:** `DAILY_BUDGET_USD` (global AI spend cap per UTC day, default `0.25`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEFAULT_USER_BUDGET_USD` (monthly per-user OpenAI spend cap in USD, default `1.0`)
 
 Full reference in `backend/.env.example` and `frontend/.env.example`.
 

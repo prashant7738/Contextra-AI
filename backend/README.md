@@ -19,7 +19,7 @@ Configure via `.env` file:
 | `SUPABASE_URL` | No | — | Supabase Storage URL (optional) |
 | `SUPABASE_SERVICE_ROLE_KEY` | No | — | Supabase Storage service role key |
 | `SUPABASE_STORAGE_BUCKET` | No | `documents` | Supabase Storage bucket name |
-| `DEFAULT_USER_TOKEN_LIMIT` | No | `25000` | Default monthly token budget per user |
+| `DEFAULT_USER_BUDGET_USD` | No | `1.0` | Default monthly OpenAI spend (USD) per user |
 
 ---
 
@@ -50,8 +50,8 @@ curl -X POST "http://localhost:8000/auth/register" \
     "id": 1,
     "name": "John Doe",
     "email": "john@example.com",
-    "token_limit": 25000,
-    "tokens_used": 0
+    "budget_usd": 1.0,
+    "spent_usd": 0.0
   }
 }
 ```
@@ -102,14 +102,14 @@ Admin endpoints are prefixed with `/admin`. All require authentication and the u
 ### GET `/admin/users`
 List all users (admin-only).
 
-### PATCH `/admin/users/{user_id}/token-limit`
-Update a user's monthly token limit.
+### PATCH `/admin/users/{user_id}/budget`
+Update a user's monthly OpenAI budget in USD.
 
 ```bash
-curl -X PATCH "http://localhost:8000/admin/users/1/token-limit" \
+curl -X PATCH "http://localhost:8000/admin/users/1/budget" \
   -H "Authorization: Bearer your_token" \
   -H "Content-Type: application/json" \
-  -d '{"token_limit": 50000}'
+  -d '{"budget_usd": 5.0}'
 ```
 
 ### GET `/admin/users/{user_id}/chats`
@@ -238,7 +238,7 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 5. Passes context to gpt-6-luna
 6. Saves message & response to history
 7. Returns answer, references, and conversation history
-8. Deducts tokens from user's monthly budget
+8. Charges the real OpenAI cost to the user's monthly USD budget
 
 ---
 
@@ -587,7 +587,7 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
    └─> Embed question → Find top-10 similar chunks (pgvector cosine search)
        → Include last 10 messages as conversation context
        → Pass to gpt-6-luna → Return answer + references + history
-       → Deduct tokens from user's monthly budget
+       → Charge actual OpenAI cost to user's monthly USD budget
 
 3. Detailed Summarization (80/20)
    └─> If specific topic → first answer_query for LLM-enriched context
@@ -620,7 +620,7 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 - **Auth**: JWT (python-jose) with access + refresh tokens
 - **Password Hashing**: bcrypt (via passlib)
 - **Storage**: Local temp files or Supabase Storage (optional)
-- **Token Budget**: Monthly per-user token tracking
+- **Spend Budget**: Monthly per-user OpenAI spend (USD) tracking
 
 ---
 

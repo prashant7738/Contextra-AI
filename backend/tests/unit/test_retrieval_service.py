@@ -75,7 +75,6 @@ def test_answer_query_merges_specific_and_broad_retrieval_context(monkeypatch):
     monkeypatch.setattr(retrieval_service, "embed_texts", fake_embed_texts)
     monkeypatch.setattr(retrieval_service, "query_similar", fake_query_similar)
     monkeypatch.setattr(retrieval_service, "ask_llm", fake_ask_llm)
-    monkeypatch.setattr(retrieval_service, "consume_user_tokens", lambda *args, **kwargs: None)
 
     answer, references = asyncio.run(
         retrieval_service.answer_query(
@@ -129,7 +128,6 @@ def test_generate_detailed_summary_for_all_uses_broader_topic_coverage(monkeypat
     monkeypatch.setattr(retrieval_service, "embed_texts", fake_embed_texts)
     monkeypatch.setattr(retrieval_service, "query_similar", fake_query_similar)
     monkeypatch.setattr(retrieval_service, "ask_detailed_summary_llm", fake_ask_detailed_summary_llm)
-    monkeypatch.setattr(retrieval_service, "consume_user_tokens", lambda *args, **kwargs: None)
 
     summary, title, sections, references, chunks_used = asyncio.run(
         retrieval_service.generate_detailed_summary(
@@ -204,7 +202,6 @@ EXPLANATION: It compares the middle element.
 '''
 
     monkeypatch.setattr(retrieval_service, "generate_flashcards_llm", fake_generate_flashcards_llm)
-    monkeypatch.setattr(retrieval_service, "consume_user_tokens", lambda *args, **kwargs: None)
 
     cards, references = asyncio.run(
         retrieval_service.generate_flashcards(

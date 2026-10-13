@@ -1,6 +1,7 @@
 from app.core.chunker import chunk_document
 from app.core.embeddings import embed_texts
 from app.repositories.pgvector_repository import store_embeddings
+from app.services.spend_budget_service import charge_to_user
 
 
 def ingest_text(pages_data: list[dict], chunk_size: int = 300, user_id: int = None, document_id: int = None, chat_id: int = None) -> int:
@@ -21,7 +22,8 @@ def ingest_text(pages_data: list[dict], chunk_size: int = 300, user_id: int = No
     
     # Extract just text for embedding
     chunk_texts = [chunk["text"] for chunk in chunks]
-    embeddings = embed_texts(chunk_texts)
+    with charge_to_user(user_id):
+        embeddings = embed_texts(chunk_texts)
     
     # Pass full chunks with user/doc/chat ID for metadata storage
     store_embeddings(chunks, embeddings, user_id=user_id, document_id=document_id, chat_id=chat_id)

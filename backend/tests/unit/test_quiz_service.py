@@ -4,8 +4,8 @@ from app.services import retrieval_service
 from app.services.quiz_service import grade_quiz_answers
 
 
-def test_generate_quiz_retrieves_context_debits_tokens_and_parses_questions(monkeypatch):
-    captured = {"queries": [], "context": None, "num_questions": None, "consumed": False}
+def test_generate_quiz_retrieves_context_and_parses_questions(monkeypatch):
+    captured = {"queries": [], "context": None, "num_questions": None}
 
     def fake_embed_texts(texts):
         query = texts[0]
@@ -43,19 +43,14 @@ EXPLANATION: Binary search halves the search space each step.
 <<<END>>>
 """
 
-    def fake_consume_user_tokens(db, user_id, cost):
-        captured["consumed"] = True
-
     monkeypatch.setattr(retrieval_service, "embed_texts", fake_embed_texts)
     monkeypatch.setattr(retrieval_service, "query_similar", fake_query_similar)
     monkeypatch.setattr(retrieval_service, "generate_quiz_llm", fake_generate_quiz_llm)
-    monkeypatch.setattr(retrieval_service, "consume_user_tokens", fake_consume_user_tokens)
 
     questions, references = asyncio.run(
         retrieval_service.generate_quiz(db=None, user_id=1, chat_id=1, num_questions=1)
     )
 
-    assert captured["consumed"] is True
     assert captured["num_questions"] == 1
     assert len(questions) == 1
     q = questions[0]
