@@ -20,6 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+    # The app (create_all on startup) or scripts/reembed_all.py may have created the table already.
+    if not op.get_context().as_sql and sa.inspect(op.get_bind()).has_table('daily_spend'):
+        return
     op.create_table(
         'daily_spend',
         sa.Column('day', sa.Date(), nullable=False),
