@@ -1,62 +1,60 @@
 import asyncio
 import logging
 
-from google import genai
-from google.genai import types
-from huggingface_hub import InferenceClient
+import openai
+from openai import OpenAI
 
-from app.settings import settings
+from app.core.openai_client import get_openai_client, is_unbilled_error
+from app.services import spend_budget_service as budget
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-3.7-flash"
+OPENAI_MODEL = "gpt-6-luna"
+REASONING_EFFORT = "low"
 
-_gemini_client: genai.Client | None = None
-_fallback_client: InferenceClient | None = None
-
-
-def get_gemini_client() -> genai.Client:
-    """Primary LLM client; reads GEMINI_API_KEY/GOOGLE_API_KEY from the environment."""
-    global _gemini_client
-    if _gemini_client is None:
-        _gemini_client = genai.Client()
-    return _gemini_client
+# Optional params the model rejected with a 400; skipped on later calls.
+_unsupported_params: set[str] = set()
 
 
-def get_fallback_llm() -> InferenceClient:
-    global _fallback_client
-    if _fallback_client is None:
-        if not settings.hf_token:
-            raise RuntimeError("Hugging Face API token not set. Set `HF_TOKEN` in environment or .env as `hf_token`.")
-        _fallback_client = InferenceClient(
-            model="meta-llama/Llama-3.1-8B-Instruct",
-            api_key=settings.hf_token,
-        )
-    return _fallback_client
+def _create_completion(client: OpenAI, prompt: str, max_tokens: int, temperature: float):
+    optional = {"temperature": temperature, "reasoning_effort": REASONING_EFFORT}
+    while True:
+        kwargs = {k: v for k, v in optional.items() if k not in _unsupported_params}
+        try:
+            return client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=max_tokens,
+                **kwargs,
+            )
+        except openai.BadRequestError as exc:
+            rejected = next((name for name in kwargs if name in str(exc)), None)
+            if rejected is None:
+                raise
+            logger.warning("%s rejected parameter %s; retrying without it", OPENAI_MODEL, rejected)
+            _unsupported_params.add(rejected)
 
 
 def _generate_text(prompt: str, max_tokens: int, temperature: float) -> str:
-    """Try Gemini first; on any failure, fall back to the HuggingFace client."""
+    """Call gpt-6-luna, charging the global daily budget with the real usage."""
+    reserved = budget.reserve(budget.llm_worst_case_micro(prompt, max_tokens))
     try:
-        client = get_gemini_client()
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=max_tokens,
-                temperature=temperature,
-            ),
-        )
-        return response.text
-    except Exception:
-        logger.warning("Gemini call failed, falling back to HuggingFace", exc_info=True)
-        client = get_fallback_llm()
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        return response.choices[0].message.content
+        response = _create_completion(get_openai_client(), prompt, max_tokens, temperature)
+    except Exception as exc:
+        if is_unbilled_error(exc):
+            budget.settle(reserved, 0)
+        raise
+
+    usage = response.usage
+    if usage is not None:
+        details = getattr(usage, "prompt_tokens_details", None)
+        cached = getattr(details, "cached_tokens", 0) or 0
+        budget.settle(reserved, budget.llm_cost_micro(usage.prompt_tokens, cached, usage.completion_tokens))
+
+    text = response.choices[0].message.content
+    if not text:
+        raise RuntimeError("The model returned an empty response")
+    return text
 
 
 def _build_chat_prompt(context: str, question: str) -> str:

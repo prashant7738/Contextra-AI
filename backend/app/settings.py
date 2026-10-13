@@ -6,7 +6,6 @@ MIN_SECRET_KEY_LENGTH = 32
 
 class Settings(BaseSettings):
     database_url: str = ""
-    hf_token: str = ""
     admin_email: str = ""
     cron_secret: str = ""
 
@@ -15,9 +14,15 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "documents"
 
-    # Embedding provider: "local", "openai", "huggingface"
-    embedding_provider: str = "local"
     openai_api_key: str = ""
+
+    # Global daily spend cap across all users (UTC day), in USD
+    daily_budget_usd: float = 0.25
+    # gpt-6-luna and text-embedding-3-small prices, USD per 1M tokens
+    llm_input_price_per_m: float = 0.10
+    llm_cached_input_price_per_m: float = 0.01
+    llm_output_price_per_m: float = 0.50
+    embedding_price_per_m: float = 0.02
 
     # JWT Configuration
     secret_key: str = ""

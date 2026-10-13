@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from pgvector.sqlalchemy import Vector
 
+from app.core.embeddings import EMBEDDING_MODEL
 from app.database import SessionLocal
 from app.models.embedding import Embedding
 
@@ -35,6 +36,7 @@ def store_embeddings(
                 chunk_metadata={
                     "page": chunk.get("page", 0),
                     "filename": chunk.get("filename", "unknown"),
+                    "embedding_model": EMBEDDING_MODEL,
                 },
             )
             db.add(emb)

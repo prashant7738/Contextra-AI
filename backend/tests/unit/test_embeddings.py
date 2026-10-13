@@ -1,29 +1,68 @@
-import logging
+from types import SimpleNamespace
 
-import httpx
+import pytest
 
 from app.core import embeddings
 
 
-def test_embed_huggingface_logs_diagnostics_and_falls_back_on_client_failure(monkeypatch, caplog):
-    monkeypatch.setattr(embeddings.settings, "embedding_provider", "huggingface")
-    monkeypatch.setattr(embeddings.settings, "hf_token", "hf_test_token")
-    monkeypatch.setattr(embeddings, "_embed_local", lambda texts: [[9.0, 8.0, 7.0]])
+def _response(vectors, total_tokens):
+    data = [SimpleNamespace(index=i, embedding=v) for i, v in enumerate(vectors)]
+    return SimpleNamespace(data=list(reversed(data)), usage=SimpleNamespace(total_tokens=total_tokens))
 
-    caplog.set_level(logging.INFO)
 
-    class FailingInferenceClient:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
+def _client(create):
+    return SimpleNamespace(embeddings=SimpleNamespace(create=create))
 
-        def feature_extraction(self, *args, **kwargs):
-            request = httpx.Request("POST", "https://router.huggingface.co/v1")
-            raise httpx.ConnectError("No address associated with hostname", request=request)
 
-    monkeypatch.setattr(embeddings, "InferenceClient", FailingInferenceClient)
+def test_embed_texts_uses_small_model_with_384_dims_and_settles_usage(monkeypatch):
+    captured = {}
+    ledger = {}
 
-    assert embeddings._embed_huggingface(["hello world"]) == [[9.0, 8.0, 7.0]]
-    assert "provider=huggingface" in caplog.text
-    assert "api_url=https://api-inference.huggingface.co/pipeline/feature-extraction/BAAI/bge-small-en-v1.5" in caplog.text
-    assert "hostname=api-inference.huggingface.co" in caplog.text
+    def create(**kwargs):
+        captured.update(kwargs)
+        return _response([[1.0], [2.0]], total_tokens=1000)
+
+    monkeypatch.setattr(embeddings, "get_openai_client", lambda: _client(create))
+    monkeypatch.setattr(embeddings.budget, "reserve", lambda micro: micro)
+    monkeypatch.setattr(embeddings.budget, "settle", lambda reserved, actual: ledger.update(settled=(reserved, actual)))
+
+    result = embeddings.embed_texts(["a", "b"])
+
+    assert captured["model"] == "text-embedding-3-small"
+    assert captured["dimensions"] == 384
+    # Results come back in input order even if the API returns them shuffled.
+    assert result == [[1.0], [2.0]]
+    assert ledger["settled"][1] == 20  # 1000 tokens at $0.02 / 1M = 20 micro-USD
+
+
+def test_embed_texts_batches_large_inputs(monkeypatch):
+    batch_sizes = []
+
+    def create(**kwargs):
+        batch_sizes.append(len(kwargs["input"]))
+        return _response([[0.0]] * len(kwargs["input"]), total_tokens=1)
+
+    monkeypatch.setattr(embeddings, "get_openai_client", lambda: _client(create))
+    monkeypatch.setattr(embeddings.budget, "reserve", lambda micro: micro)
+    monkeypatch.setattr(embeddings.budget, "settle", lambda reserved, actual: None)
+
+    embeddings.embed_texts(["x"] * 600)
+
+    assert batch_sizes == [256, 256, 88]
+
+
+def test_embed_texts_does_not_call_openai_when_budget_is_exhausted(monkeypatch):
+    from fastapi import HTTPException
+
+    def reserve(micro):
+        raise HTTPException(status_code=429, detail="Daily AI budget reached.")
+
+    monkeypatch.setattr(embeddings.budget, "reserve", reserve)
+    monkeypatch.setattr(
+        embeddings, "get_openai_client", lambda: pytest.fail("OpenAI must not be called over budget")
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        embeddings.embed_texts(["hello"])
+
+    assert exc_info.value.status_code == 429

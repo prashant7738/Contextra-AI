@@ -9,10 +9,10 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: GEMINI_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
-      - key: HF_TOKEN
-        sync: false
+      - key: DAILY_BUDGET_USD
+        value: "0.25"
       - key: ADMIN_EMAIL
         sync: false
       - key: SECRET_KEY
@@ -34,8 +34,3 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: documents
-      # Embedding provider: "local" | "openai" | "huggingface"
-      - key: EMBEDDING_PROVIDER
-        value: huggingface
-      - key: OPENAI_API_KEY
-        sync: false

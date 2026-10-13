@@ -7,8 +7,8 @@ Configure via `.env` file:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string (e.g. `postgresql+psycopg2://user:pass@localhost:5432/contextra`) |
-| `GEMINI_API_KEY` | No | — | Primary LLM provider (Gemini). Falls back to `HF_TOKEN` (HuggingFace) if unset or on error |
-| `HF_TOKEN` | Yes | — | Hugging Face API token for embeddings, and fallback LLM if Gemini is unavailable |
+| `OPENAI_API_KEY` | Yes | — | OpenAI API key, used for the `gpt-6-luna` LLM and `text-embedding-3-small` embeddings |
+| `DAILY_BUDGET_USD` | No | `0.25` | Global OpenAI spend cap per UTC day, shared by all users. Requests get a 429 once it is reached |
 | `SECRET_KEY` | Yes | — | JWT signing secret |
 | `ADMIN_EMAIL` | No | — | Email of the admin user (admin endpoints require this) |
 | `CRON_SECRET` | No | — | Secret for `/cron/run` endpoint |
@@ -16,8 +16,6 @@ Configure via `.env` file:
 | `ALGORITHM` | No | `HS256` | JWT algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Refresh token lifetime |
-| `EMBEDDING_PROVIDER` | No | `local` | Embedding provider: `local`, `openai`, or `huggingface` |
-| `OPENAI_API_KEY` | No | — | Required if `EMBEDDING_PROVIDER=openai` |
 | `SUPABASE_URL` | No | — | Supabase Storage URL (optional) |
 | `SUPABASE_SERVICE_ROLE_KEY` | No | — | Supabase Storage service role key |
 | `SUPABASE_STORAGE_BUCKET` | No | `documents` | Supabase Storage bucket name |
@@ -237,7 +235,7 @@ curl -X POST "http://localhost:8000/chats/query?user_id=1" \
 2. Embeds the question
 3. Finds top-10 similar chunks from the chat
 4. Includes previous conversation context (last 10 messages)
-5. Passes context to Gemini (falls back to Llama 3.1 8B on error)
+5. Passes context to gpt-6-luna
 6. Saves message & response to history
 7. Returns answer, references, and conversation history
 8. Deducts tokens from user's monthly budget
@@ -588,7 +586,7 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 2. Query & Chat
    └─> Embed question → Find top-10 similar chunks (pgvector cosine search)
        → Include last 10 messages as conversation context
-       → Pass to Gemini (falls back to Llama 3.1 8B) → Return answer + references + history
+       → Pass to gpt-6-luna → Return answer + references + history
        → Deduct tokens from user's monthly budget
 
 3. Detailed Summarization (80/20)
@@ -613,9 +611,9 @@ curl -X POST "http://localhost:8000/chats/flashcard?user_id=1&chat_id=1" \
 
 - **Framework**: FastAPI (Python 3.12+)
 - **Database**: PostgreSQL + pgvector (vector extension)
-- **Embedding Model**: BAAI/bge-small-en-v1.5 (384-dim, local via sentence-transformers)
-- **Embedding Providers**: local (default), OpenAI (text-embedding-3-small), HuggingFace Inference API
-- **LLM**: Gemini (`gemini-3.7-flash`), falling back to meta-llama/Llama-3.1-8B-Instruct (via HuggingFace Inference API) on error
+- **Embedding Model**: OpenAI `text-embedding-3-small` (requested at 384 dimensions to match the `Vector(384)` column)
+- **LLM**: OpenAI `gpt-6-luna` only, with no fallback model
+- **Spend cap**: global daily USD budget (`DAILY_BUDGET_USD`, default $0.25). Each OpenAI call reserves its worst-case cost, then settles to the real usage. `GET /admin/spend` shows today's spend
 - **PDF Extraction**: PyMuPDF (text) + EasyOCR (scanned page fallback)
 - **ORM**: SQLAlchemy 2.0
 - **Migrations**: Alembic
@@ -717,7 +715,6 @@ uv run alembic downgrade -1
 
 ## Production Considerations
 
-- Replace local embeddings with OpenAI or HuggingFace Inference API
 - Use a connection pooler (e.g. PgBouncer) for PostgreSQL
 - Implement rate limiting
 - Add comprehensive logging (structured logging)
@@ -731,14 +728,15 @@ uv run alembic downgrade -1
 
 ## Troubleshooting
 
-### HuggingFace Token Issues
+### OpenAI Key or Budget Issues
 ```bash
-# Set your token
-export HF_TOKEN=your_token_here
+# Set your key in .env (never commit it)
+OPENAI_API_KEY=your_key_here
 
-# Or add to .env file
-HF_TOKEN=your_token_here
+# Check today's spend (admin only)
+GET /admin/spend
 ```
+A `429 Daily AI budget reached` response means the global cap was hit. It resets at 00:00 UTC, or raise `DAILY_BUDGET_USD`.
 
 ### PostgreSQL Connection Failed
 ```bash
@@ -752,16 +750,10 @@ DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/contextra
 psql -U postgres -d contextra -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-### Embedding Provider Issues
+### Re-embedding Existing Documents
+Documents ingested before the OpenAI switch have BGE vectors, which can't be compared with OpenAI vectors. Re-embed them once (resumable, counts against the daily budget):
 ```bash
-# Check configured provider
-EMBEDDING_PROVIDER=local  # Uses sentence-transformers locally (no API key needed)
-# For HuggingFace API:
-EMBEDDING_PROVIDER=huggingface
-HF_TOKEN=your_token_here
-# For OpenAI:
-EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=your_key_here
+python -m scripts.reembed_all
 ```
 
 ---

@@ -10,6 +10,7 @@ from app.dependencies import get_current_user
 from app.settings import settings
 from app.repositories import chat_repository
 from app.repositories import user_repository
+from app.services import spend_budget_service
 from app.models.user import User
 from app.schemas.user import UserResponse
 from app.schemas.chat import ChatResponse, ChatMessageResponse
@@ -26,6 +27,12 @@ def _ensure_admin(current_user: UserResponse):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Admin not configured")
     if not secrets.compare_digest(current_user.email, settings.admin_email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+
+@router.get("/spend")
+def admin_get_daily_spend(current_user: UserResponse = Depends(get_current_user)):
+    _ensure_admin(current_user)
+    return spend_budget_service.get_today_spend()
 
 
 @router.get("/users", response_model=List[UserResponse])

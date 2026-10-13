@@ -18,6 +18,9 @@ from sqlalchemy.orm import Session
 
 BROAD_FALLBACK_QUERY = "Provide a high-yield summary of these study notes"
 
+# Caps retrieved context (~5k tokens) so one request can't run up the OpenAI bill.
+MAX_CONTEXT_CHARS = 20_000
+
 _FILENAME_HINT_PATTERN = re.compile(r"(?:\b|['\"])([A-Za-z0-9_-]+(?:\.pdf)?)(?:\b|['\"])", re.IGNORECASE)
 
 
@@ -39,6 +42,7 @@ async def _retrieve_context(
 
     query_results = await asyncio.gather(*(retrieve_query(query) for query in valid_queries))
 
+    total_chars = 0
     for results in query_results:
         for document, metadata in zip(results.get("documents", [[]])[0], results.get("metadatas", [[]])[0]):
             cleaned_document = str(document).strip()
@@ -54,7 +58,11 @@ async def _retrieve_context(
             if reference_key in seen:
                 continue
 
+            if documents and total_chars + len(cleaned_document) > MAX_CONTEXT_CHARS:
+                return documents, references
+
             seen.add(reference_key)
+            total_chars += len(cleaned_document)
             documents.append(cleaned_document)
             references.append(
                 {

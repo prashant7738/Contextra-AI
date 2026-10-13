@@ -26,8 +26,8 @@ Keep projects, courses, and research silos separate. Each chat has its own docum
 
 | Frontend | Backend | AI | Database |
 |---|---|---|---|
-| Astro 6 + React 18 | FastAPI (Python 3.12) | Gemini (fallback: Llama 3.1 8B via HuggingFace) | PostgreSQL + pgvector |
-| TypeScript, Vite | SQLAlchemy, Alembic | BGE-small embeddings | Supabase |
+| Astro 6 + React 18 | FastAPI (Python 3.12) | OpenAI gpt-6-luna (chat, summaries, flashcards, quizzes) | PostgreSQL + pgvector |
+| TypeScript, Vite | SQLAlchemy, Alembic | OpenAI text-embedding-3-small embeddings | Supabase |
 | Custom design system | JWT auth, bcrypt | Hybrid OCR (fitz + EasyOCR) | — |
 
 ---
@@ -40,7 +40,7 @@ Keep projects, courses, and research silos separate. Each chat has its own docum
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # add DATABASE_URL, GEMINI_API_KEY, HF_TOKEN, SECRET_KEY, ADMIN_EMAIL
+cp .env.example .env   # add DATABASE_URL, OPENAI_API_KEY, SECRET_KEY, ADMIN_EMAIL
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
@@ -58,9 +58,9 @@ npm run dev
 
 ## Environment variables
 
-**Required:** `DATABASE_URL`, `HF_TOKEN`, `SECRET_KEY`, `ADMIN_EMAIL`, `CRON_SECRET` (optional: `GEMINI_API_KEY` for the primary LLM provider)
+**Required:** `DATABASE_URL`, `OPENAI_API_KEY`, `SECRET_KEY`, `ADMIN_EMAIL`, `CRON_SECRET`
 
-**Optional:** `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEFAULT_USER_TOKEN_LIMIT`
+**Optional:** `DAILY_BUDGET_USD` (global AI spend cap per UTC day, default `0.25`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEFAULT_USER_TOKEN_LIMIT`
 
 Full reference in `backend/.env.example` and `frontend/.env.example`.
 

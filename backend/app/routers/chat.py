@@ -181,6 +181,8 @@ async def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(ge
             references=[Reference(**ref) for ref in references],
             conversation_history=history_responses,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
@@ -241,6 +243,8 @@ async def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db:
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error generating summary: {str(exc)}")
 
@@ -309,6 +313,8 @@ async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[Flash
     
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(exc)}")
 
@@ -415,6 +421,8 @@ async def generate_quiz_endpoint(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error generating quiz: {str(exc)}")
 
