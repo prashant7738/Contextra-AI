@@ -145,3 +145,127 @@
   color: var(--color-accent-hover);
   text-decoration: underline;
 }
+
+/* ── Split layout ─────────────────────────────────────── */
+.auth-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: 0;
+  background: var(--color-bg);
+}
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: clamp(32px, 6vw, 80px);
+  background:
+    radial-gradient(700px 400px at 0% 0%, rgba(255, 255, 255, 0.12), transparent 60%),
+    var(--color-accent);
+  color: var(--color-accent-fg);
+}
+.auth-aside h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+}
+.auth-aside ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+  font-size: var(--text-base);
+}
+.auth-aside li::before {
+  content: "✓";
+  margin-right: var(--space-3);
+  font-weight: 700;
+}
+
+.auth-brand {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: inherit;
+  text-decoration: none;
+}
+.auth-brand span {
+  margin-left: 4px;
+  opacity: 0.7;
+}
+.auth-brand-mobile {
+  display: none;
+  margin-bottom: var(--space-5);
+  color: var(--color-text);
+}
+
+.auth-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-7);
+}
+.auth-main .auth-card {
+  box-shadow: var(--shadow-2);
+}
+.auth-card h1 {
+  margin-bottom: var(--space-2);
+  text-align: left;
+}
+.auth-sub {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Password show/hide ───────────────────────────────── */
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 64px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.password-toggle:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+}
+.password-toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+@media (max-width: 860px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+  }
+  .auth-aside {
+    display: none;
+  }
+  .auth-brand-mobile {
+    display: inline-block;
+  }
+  .auth-main {
+    padding: var(--space-5);
+  }
+  .auth-main .auth-card {
+    padding: var(--space-6);
+  }
+}

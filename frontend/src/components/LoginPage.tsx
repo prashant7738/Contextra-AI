@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import { apiClient } from '../utils/api';
 import { AuthService, type AuthTokens, type User } from '../utils/auth';
-import './AuthPages.css';
+import { AuthShell, PasswordInput } from './AuthShell';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,9 +39,10 @@ export default function LoginPage() {
   const isInvalid = Boolean(error);
 
   return (
-    <div className="auth-container">
+    <AuthShell>
       <main className="auth-card" aria-labelledby="login-title">
-        <h1 id="login-title">Login</h1>
+        <h1 id="login-title">Welcome back</h1>
+        <p className="auth-sub">Log in to pick up where you left off.</p>
         <form onSubmit={handleSubmit} noValidate>
           {error && (
             <div className="error-message" role="alert" id={errorId}>
@@ -68,10 +69,10 @@ export default function LoginPage() {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
+              
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -84,14 +85,14 @@ export default function LoginPage() {
           </div>
 
           <button type="submit" className="submit-button" disabled={loading} aria-busy={loading}>
-            {loading ? 'Logging in…' : 'Login'}
+            {loading ? 'Logging in…' : 'Log in'}
           </button>
         </form>
 
         <p className="auth-link">
-          Don't have an account? <a href="/register">Register here</a>
+          Don't have an account? <a href="/register">Sign up</a>
         </p>
       </main>
-    </div>
+    </AuthShell>
   );
 }

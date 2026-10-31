@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import { apiClient } from '../utils/api';
 import { AuthService, type AuthTokens, type User } from '../utils/auth';
-import './AuthPages.css';
+import { AuthShell, PasswordInput } from './AuthShell';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -50,9 +50,10 @@ export default function RegisterPage() {
   const isInvalid = Boolean(error);
 
   return (
-    <div className="auth-container">
+    <AuthShell>
       <main className="auth-card" aria-labelledby="register-title">
-        <h1 id="register-title">Register</h1>
+        <h1 id="register-title">Create your account</h1>
+        <p className="auth-sub">Free to start. Upload your first PDF in a minute.</p>
         <form onSubmit={handleSubmit} noValidate>
           {error && (
             <div className="error-message" role="alert" id={errorId}>
@@ -96,10 +97,10 @@ export default function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
+              
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -114,10 +115,10 @@ export default function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
+            <PasswordInput
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
+              
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -131,14 +132,14 @@ export default function RegisterPage() {
           </div>
 
           <button type="submit" className="submit-button" disabled={loading} aria-busy={loading}>
-            {loading ? 'Registering…' : 'Register'}
+            {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
         <p className="auth-link">
-          Already have an account? <a href="/login">Login here</a>
+          Already have an account? <a href="/login">Log in</a>
         </p>
       </main>
-    </div>
+    </AuthShell>
   );
 }
