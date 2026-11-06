@@ -5,9 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import SessionLocal
 from app.routers import admin, auth, chat, cron, documents, health
-from app.services.task_recovery import fail_interrupted_tasks
+from app.core import job_queue
 from app.settings import settings
 
 logging.basicConfig(
@@ -23,13 +22,14 @@ async def lifespan(app: FastAPI):
     # Log only whether the key is present, never its value.
     logger.info("OpenAI API key present: %s", bool(settings.openai_api_key))
     # Schema is managed by Alembic (`alembic upgrade head` runs before start).
+    # Ingestion and summary jobs are claimed from the database by these
+    # workers; jobs interrupted by a restart are retried by the reaper.
+    worker = job_queue.Worker(job_queue.worker_threads_from_env())
+    worker.start()
     try:
-        with SessionLocal() as db:
-            fail_interrupted_tasks(db)
-    except Exception:
-        # Never block startup on housekeeping.
-        logger.exception("Could not recover interrupted tasks")
-    yield
+        yield
+    finally:
+        worker.stop()
 
 
 app = FastAPI(title="Contextra AI", lifespan=lifespan)

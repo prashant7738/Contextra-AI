@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON, Index, text
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -15,3 +15,9 @@ class SummaryTask(Base):
     error = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
+    # Job queue bookkeeping (see app/core/job_queue.py)
+    params = Column(JSON, nullable=True)  # n_results / max_tokens for the worker
+    attempts = Column(Integer, nullable=False, server_default=text("0"), default=0)
+    locked_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("ix_summary_tasks_status", "status"),)

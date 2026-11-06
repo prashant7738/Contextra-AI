@@ -2,7 +2,7 @@ import logging
 import tempfile
 from typing import List, Optional
 
-from fastapi import APIRouter, UploadFile, Depends, HTTPException, File, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, Depends, HTTPException, File, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from app.schemas.document import DocumentResponse
 from app.schemas.ingestion_task import TaskCreatedResponse, TaskStatusResponse
 from app.models.document import Document
 from app.models.ingestion_task import IngestionTask
-from app.services.background_ingestion import process_ingestion_task
+from app.core import job_queue
 from app.services.storage_service import create_upload_presigned_url
 from app.repositories import chat_repository
 
@@ -118,7 +118,6 @@ def presign_upload(
 @router.post("/ingest/{task_id}/confirm", response_model=TaskCreatedResponse)
 def confirm_ingest(
     task_id: int,
-    background_tasks: BackgroundTasks,
     user_id: int = Query(...),
     use_ocr: bool = Query(default=False),
     db: Session = Depends(get_db),
@@ -136,16 +135,15 @@ def confirm_ingest(
         raise HTTPException(status_code=400, detail=f"Task already {task.status}")
 
     task.status = "pending"
+    task.use_ocr = use_ocr
     db.commit()
-
-    background_tasks.add_task(process_ingestion_task, task.id, use_ocr)
+    job_queue.notify()
 
     return TaskCreatedResponse(task_id=task.id, status="pending")
 
 
 @router.post("/ingest/direct", response_model=TaskCreatedResponse)
 async def direct_ingest(
-    background_tasks: BackgroundTasks,
     files: Optional[List[UploadFile]] = File(default=None),
     file: Optional[UploadFile] = File(default=None),
     user_id: int = Query(...),
@@ -191,15 +189,15 @@ async def direct_ingest(
             filename=upload.filename or "file",
             status="pending",
             file_path=tmp_path,
+            use_ocr=use_ocr,
         )
         db.add(task)
         created_tasks.append(task)
 
     db.commit()
-
     for task in created_tasks:
         db.refresh(task)
-        background_tasks.add_task(process_ingestion_task, task.id, use_ocr)
+    job_queue.notify()
 
     first_task = created_tasks[0]
     return TaskCreatedResponse(task_id=first_task.id, status="pending")

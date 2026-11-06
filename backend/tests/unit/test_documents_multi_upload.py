@@ -51,13 +51,8 @@ def test_direct_ingest_creates_a_task_for_each_uploaded_file(monkeypatch, tmp_pa
 
         app.dependency_overrides[get_current_user] = lambda: UserResponse(id=user.id, name=user.name, email=user.email, budget_usd=1.0, spent_usd=0.0)
 
-        created_tasks = []
-
-        class FakeBackgroundTasks:
-            def add_task(self, fn, task_id, use_ocr):
-                created_tasks.append((fn, task_id, use_ocr))
-
-        monkeypatch.setattr('app.routers.documents.BackgroundTasks', FakeBackgroundTasks, raising=False)
+        notified = []
+        monkeypatch.setattr('app.routers.documents.job_queue.notify', lambda: notified.append(True))
 
         client = TestClient(app)
         response = client.post(
@@ -72,5 +67,8 @@ def test_direct_ingest_creates_a_task_for_each_uploaded_file(monkeypatch, tmp_pa
         assert response.json()['status'] == 'pending'
         assert db.query(IngestionTask).count() == 2
         assert {task.filename for task in db.query(IngestionTask).all()} == {'file1.pdf', 'file2.pdf'}
+        # Jobs are queued in the database (status pending) and workers are woken.
+        assert {task.status for task in db.query(IngestionTask).all()} == {'pending'}
+        assert notified
     finally:
         db.close()

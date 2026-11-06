@@ -86,6 +86,7 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request, inc
 
 - **Backend (Render):** `render.yaml` builds with `pip install -r requirements.txt` and starts with `alembic upgrade head && uvicorn ...`, so migrations are applied on every deploy. If the service was created by hand rather than from the blueprint, set the same Start Command in the Render dashboard.
 - **Frontend (Vercel):** static Astro build (`npm run build`, output `dist`).
+- Background jobs: PDF ingestion and summaries are queued in PostgreSQL and run by worker threads inside the API process (`JOB_WORKERS`, default 2). Jobs interrupted by a restart or crash are retried automatically (up to 3 attempts), and several instances can share the queue safely.
 - Health checks: `GET /health` (liveness, no dependencies) and `GET /health/ready` (checks the database).
 
 ---

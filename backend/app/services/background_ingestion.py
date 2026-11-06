@@ -5,6 +5,8 @@ import fitz
 from fastapi import HTTPException
 
 from app.database import SessionLocal
+from app.models.document import Document
+from app.models.embedding import Embedding
 from app.models.ingestion_task import IngestionTask
 from app.services.ingestion_service import ingest_text
 from app.services.document_service import create_document
@@ -29,17 +31,30 @@ def user_facing_error(exc: Exception) -> str:
         return str(exc.detail)
     if isinstance(exc, ValueError) and str(exc):
         return str(exc)
+    if isinstance(exc, FileNotFoundError):
+        return "The uploaded file is no longer available. Please upload it again."
     if isinstance(exc, fitz.FileDataError):
         return "The file could not be read as a PDF."
     return GENERIC_INGESTION_ERROR
 
 
-def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
+def _discard_partial_document(db, task: IngestionTask) -> None:
+    """A previous attempt may have died after creating the document: start clean."""
+    if not task.document_id:
+        return
+    db.query(Embedding).filter(Embedding.document_id == task.document_id).delete(synchronize_session=False)
+    db.query(Document).filter(Document.id == task.document_id).delete(synchronize_session=False)
+    task.document_id = None
+    db.commit()
+    logger.info("Task %s: removed partial document from an interrupted attempt", task.id)
+
+
+def process_ingestion_task(task_id: int, use_ocr: bool | None = None) -> None:
+    """Run one ingestion job (normally claimed by the job queue worker)."""
     db = SessionLocal()
     task = None
     local_path = None
     try:
-        logger.info(f"Starting ingestion task {task_id}: process_ingestion_task(use_ocr={use_ocr})")
         task = db.query(IngestionTask).filter(IngestionTask.id == task_id).first()
         if not task:
             logger.error(f"IngestionTask {task_id} not found")
@@ -47,9 +62,13 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         if task.status not in ("pending", "processing"):
             logger.warning(f"IngestionTask {task_id} is {task.status}, skipping")
             return
+        if use_ocr is None:
+            use_ocr = bool(getattr(task, "use_ocr", False))
+        logger.info("Starting ingestion task %s (attempt %s, use_ocr=%s)", task_id, getattr(task, "attempts", 1), use_ocr)
 
         task.status = "processing"
         db.commit()
+        _discard_partial_document(db, task)
 
         if task.storage_path:
             logger.info(f"Task {task_id}: downloading file via download_file() from storage_path={task.storage_path}")
@@ -94,6 +113,8 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
 
         logger.info(f"Task {task_id}: creating document record")
         document = create_document(db, task.user_id, task.chat_id, task.filename, full_text)
+        task.document_id = document.id
+        db.commit()
         logger.info(f"Task {task_id}: ingesting text into embeddings and postgres")
         chunks_count = ingest_text(
             pages_data,

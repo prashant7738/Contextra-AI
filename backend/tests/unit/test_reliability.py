@@ -45,6 +45,7 @@ def _run_ingestion(monkeypatch, tmp_path, *, storage_path=None, fail=False):
     task = _FakeTask(
         id=1, status="pending", storage_path=storage_path, file_path=None if storage_path else str(local),
         user_id=1, chat_id=2, filename="t.pdf", chunks_count=0, error_message=None,
+        document_id=None, use_ocr=False, attempts=1,
     )
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = task
