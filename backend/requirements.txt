@@ -1,11 +1,7 @@
-# CPU-only PyTorch (needed by easyocr). The default Linux wheel bundles ~4GB of unused CUDA libraries.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
+# Runtime dependencies. OCR for scanned PDFs is optional and heavy (PyTorch);
+# install requirements-ocr.txt as well to enable it.
 alembic>=1.18.4
-asyncpg>=0.29.0
 bcrypt==4.0.1
-easyocr>=1.7.0
 fastapi>=0.136.1
 httpx>=0.27.0
 numpy>=2.4.6

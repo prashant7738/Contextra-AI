@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+dist/
+.astro/
+.venv/
+__pycache__/
+*.py[oc]
+.pytest_cache/
+
+# Local environment files (copy the matching .env.example instead)
+.env
+.env.*
+!.env.example
+
+# OS / editor noise
+.DS_Store
+*.log

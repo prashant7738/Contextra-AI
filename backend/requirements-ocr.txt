@@ -1,0 +1,7 @@
+# Optional OCR for scanned PDFs (pip install -r requirements.txt -r requirements-ocr.txt).
+# Needs ~2 GB of RAM at runtime: not suitable for Render's free plan.
+# CPU-only PyTorch; the default Linux wheel bundles ~4GB of unused CUDA libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+easyocr>=1.7.0
