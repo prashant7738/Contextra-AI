@@ -16,7 +16,11 @@ def _make_app_with_db(db):
     return app
 
 
-def test_direct_ingest_creates_a_task_for_each_uploaded_file(monkeypatch):
+def test_direct_ingest_creates_a_task_for_each_uploaded_file(monkeypatch, tmp_path):
+    # Uploads are spooled to temp files; keep them inside pytest's tmp dir.
+    import tempfile
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool

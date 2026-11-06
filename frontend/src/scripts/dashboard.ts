@@ -676,7 +676,7 @@ import { renderChatListHtml } from '../utils/chat-list';
       await pollIngestionTask(taskId);
 
       if (selectedUploadFile === currentSelection) {
-        clearUploadSelection();
+        clearUploadSelection(true);
       } else {
         renderUploadSelection(selectedUploadFile ? 'ready' : 'idle');
       }
@@ -1104,11 +1104,12 @@ import { renderChatListHtml } from '../utils/chat-list';
     renderUploadSelection('ready');
   }
 
-  function clearUploadSelection() {
+  function clearUploadSelection(keepStatus = false) {
     selectedUploadFile = null;
     if (fileInput) fileInput.value = '';
     renderUploadSelection('idle');
-    setStatus('No file selected', 'warning');
+    // After a successful upload keep the "N chunks indexed" confirmation visible.
+    if (!keepStatus) setStatus('No file selected', 'warning');
   }
 
   function formatFileSize(bytes: number) {
