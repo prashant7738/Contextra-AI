@@ -540,21 +540,21 @@ import { renderChatListHtml } from '../utils/chat-list';
       const docResp = await apiFetch(`/documents/?user_id=${user.id}&chat_id=${chatId}`);
       if (!docResp.ok) {
         listEl.innerHTML = '';
-        container.style.display = 'none';
+        container.hidden = true;
         return;
       }
       const docs = await docResp.json();
       if (!docs || docs.length === 0) {
         listEl.innerHTML = '';
-        container.style.display = 'none';
+        container.hidden = true;
         return;
       }
       listEl.innerHTML = docs.map((d: any) => `<li>${escapeHtml(d.filename)}</li>`).join('');
-      container.style.display = '';
+      container.hidden = false;
     } catch (err) {
       console.debug('Error fetching docs for chat', err);
       listEl.innerHTML = '';
-      container.style.display = 'none';
+      container.hidden = true;
     }
   }
 
@@ -622,7 +622,7 @@ import { renderChatListHtml } from '../utils/chat-list';
       if (pendingTurn) {
         const botBubble = pendingTurn.querySelector('.bubble-bot .bot-content');
         if (botBubble) {
-          botBubble.innerHTML = `<p style="color: #c33;">Error: ${escapeHtml(err.message)}</p>`;
+          botBubble.innerHTML = `<p class="text-error">Error: ${escapeHtml(err.message)}</p>`;
         }
         pendingTurn.id = '';
       }
@@ -1316,8 +1316,8 @@ import { renderChatListHtml } from '../utils/chat-list';
 
   function updateTopbarButtons() {
     const hasChat = Boolean(selectedChatId);
-    if (summarizerBtn) (summarizerBtn as HTMLElement).style.display = hasChat ? '' : 'none';
-    if (flashcardBtn) (flashcardBtn as HTMLElement).style.display = hasChat ? '' : 'none';
+    if (summarizerBtn) (summarizerBtn as HTMLElement).hidden = !hasChat;
+    if (flashcardBtn) (flashcardBtn as HTMLElement).hidden = !hasChat;
     updateNavActive();
   }
 
@@ -1443,7 +1443,7 @@ import { renderChatListHtml } from '../utils/chat-list';
     if (modalMessage) modalMessage.textContent = message;
     if (modalError) { modalError.hidden = true; modalError.textContent = ''; }
     if (modalInput) {
-      modalInput.style.display = showInput ? '' : 'none';
+      modalInput.hidden = !showInput;
       modalInput.value = inputValue || '';
     }
     if (modalConfirm) {
@@ -1482,7 +1482,7 @@ import { renderChatListHtml } from '../utils/chat-list';
 
   modalConfirm?.addEventListener('click', () => {
     if (!modalResolve) return;
-    const val = modalInput && modalInput.style.display === '' ? modalInput.value.trim() : true;
+    const val = modalInput && !modalInput.hidden ? modalInput.value.trim() : true;
     modalResolve(val);
     modalResolve = null;
     closeModal();

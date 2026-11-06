@@ -2,11 +2,11 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 <BaseLayout title="User chats – Admin" requireAuth>
-  <main id="main" style="max-width:900px;margin:48px auto;padding:24px;">
+  <main class="u-332af37" id="main">
     <p><a href="/admin">← Back to admin</a></p>
     <h2 id="heading">Chats</h2>
     <div id="loading">Loading chats…</div>
-    <ul id="chats" style="list-style:none;padding:0;margin:0;display:grid;grid-gap:10px"></ul>
+    <ul class="u-c4d20ab" id="chats"></ul>
   </main>
 
   <script>
@@ -25,7 +25,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if (loadingEl) loadingEl.style.display = 'none';
       if (chatsEl) {
         chatsEl.innerHTML =
-          '<li style="padding:12px;background:#fee;color:#600">Missing user id in URL (?id=…)</li>';
+          '<li class="u-6a8d130">Missing user id in URL (?id=…)</li>';
       }
     } else {
       if (headingEl) headingEl.textContent = `Chats for user #${userId}`;
@@ -38,20 +38,20 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const res = await apiClient.get<AdminChat[]>(`/admin/users/${userId}/chats`);
       loadingEl.style.display = 'none';
       if (res.error) {
-        chatsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${escapeHtml(res.error)}</li>`;
+        chatsEl.innerHTML = `<li class="u-6a8d130">${escapeHtml(res.error)}</li>`;
         return;
       }
       const chats = res.data ?? [];
       if (!chats.length) {
         chatsEl.innerHTML =
-          '<li style="padding:12px;background:#f4f6f9;border-radius:8px">No chats</li>';
+          '<li class="u-2342759">No chats</li>';
         return;
       }
       chatsEl.innerHTML = chats
         .map(
           (c) => `
-        <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
-          <div style="font-weight:600">${escapeHtml(c.name)}</div>
+        <li class="u-22be495">
+          <div class="u-eed0f8f">${escapeHtml(c.name)}</div>
           <a href="/admin/chat-messages?id=${c.id}">View messages</a>
         </li>`
         )

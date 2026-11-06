@@ -2,11 +2,11 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 <BaseLayout title="Chat messages – Admin" requireAuth>
-  <main id="main" style="max-width:900px;margin:48px auto;padding:24px;">
+  <main class="u-332af37" id="main">
     <p><a href="/admin">← Back to admin</a></p>
     <h2 id="heading">Messages</h2>
     <div id="loading">Loading messages…</div>
-    <ul id="messages" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px"></ul>
+    <ul class="u-18de788" id="messages"></ul>
   </main>
 
   <script>
@@ -30,7 +30,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if (loadingEl) loadingEl.style.display = 'none';
       if (msgsEl) {
         msgsEl.innerHTML =
-          '<li style="padding:12px;background:#fee;color:#600">Missing chat id in URL (?id=…)</li>';
+          '<li class="u-6a8d130">Missing chat id in URL (?id=…)</li>';
       }
     } else {
       if (headingEl) headingEl.textContent = `Messages for chat #${chatId}`;
@@ -43,23 +43,23 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const res = await apiClient.get<AdminMessage[]>(`/admin/chats/${chatId}/messages`);
       loadingEl.style.display = 'none';
       if (res.error) {
-        msgsEl.innerHTML = `<li style="padding:12px;background:#fee;color:#600">${escapeHtml(res.error)}</li>`;
+        msgsEl.innerHTML = `<li class="u-6a8d130">${escapeHtml(res.error)}</li>`;
         return;
       }
       const msgs = res.data ?? [];
       if (!msgs.length) {
         msgsEl.innerHTML =
-          '<li style="padding:12px;background:#f4f6f9;border-radius:8px">No messages</li>';
+          '<li class="u-2342759">No messages</li>';
         return;
       }
       msgsEl.innerHTML = msgs
         .map(
           (m) => `
-        <li style="padding:12px;background:#fff;border-radius:8px;border:1px solid #eef">
-          <div style="font-weight:600">User: ${m.user_id}</div>
-          <div style="color:#333;margin-top:6px">${escapeHtml(m.user_message)}</div>
-          <div style="color:#0b66ff;margin-top:8px">Bot: ${escapeHtml(m.bot_response)}</div>
-          <div style="font-size:12px;color:#7b8997;margin-top:6px">${new Date(m.created_at).toLocaleString()}</div>
+        <li class="u-22be495">
+          <div class="u-eed0f8f">User: ${m.user_id}</div>
+          <div class="u-98fa35d">${escapeHtml(m.user_message)}</div>
+          <div class="u-dbfb807">Bot: ${escapeHtml(m.bot_response)}</div>
+          <div class="u-b250a2c">${new Date(m.created_at).toLocaleString()}</div>
         </li>`
         )
         .join('');

@@ -95,14 +95,18 @@ import ThemeToggle from '../components/ThemeToggle.astro';
     <span><a href="/login">Log in</a> · <a href="/register">Sign up</a></span>
   </footer>
 
-  <script is:inline>
-    (function () {
-      var authed = false;
-      try { authed = !!localStorage.getItem('access_token'); } catch (_) {}
-      if (!authed) return;
-      document.querySelectorAll('[data-auth-hide]').forEach(function (el) { el.hidden = true; });
-      document.querySelectorAll('[data-auth-show]').forEach(function (el) { el.hidden = false; });
-    })();
+  <script>
+    // Bundled (not is:inline) so it is covered by the Content-Security-Policy.
+    let authed = false;
+    try {
+      authed = !!localStorage.getItem('access_token');
+    } catch {
+      /* storage unavailable */
+    }
+    if (authed) {
+      document.querySelectorAll<HTMLElement>('[data-auth-hide]').forEach((el) => (el.hidden = true));
+      document.querySelectorAll<HTMLElement>('[data-auth-show]').forEach((el) => (el.hidden = false));
+    }
   </script>
 </BaseLayout>
 

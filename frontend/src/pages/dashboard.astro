@@ -20,8 +20,8 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 
         <nav class="topbar-nav" id="topbar-nav" aria-label="Main navigation">
           <button id="nav-chat-btn" class="nav-tab nav-tab-active" type="button">Chat</button>
-          <button id="summarizer-btn" class="nav-tab" type="button" style="display:none">Summarizer</button>
-          <button id="flashcard-btn" class="nav-tab" type="button" style="display:none">Flashcards</button>
+          <button id="summarizer-btn" class="nav-tab" type="button" hidden>Summarizer</button>
+          <button id="flashcard-btn" class="nav-tab" type="button" hidden>Flashcards</button>
         </nav>
 
         <div class="topbar-actions">
@@ -108,17 +108,17 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 
           <!-- Summary panel (replaces chat view when activated) -->
           <div id="summary-panel-container" class="panel" hidden>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)">
+            <div class="u-b3a39b6">
               <div>
                 <p class="eyebrow">Insight Layer</p>
                 <h3>Pareto Insight</h3>
               </div>
-              <div style="display:flex;gap:8px;align-items:center">
+              <div class="u-01ef7fc">
                 <span id="summary-chat-pill" class="pill">No chat selected</span>
                 <button id="summary-close" class="button button-ghost" type="button">Back</button>
               </div>
             </div>
-            <div style="padding:18px">
+            <div class="u-8e11ed6">
               <form id="summary-form" class="summary-controls">
                 <label class="field">
                   <span>Topic focus</span>
@@ -137,14 +137,14 @@ import ThemeToggle from '../components/ThemeToggle.astro';
                   <button id="summary-clear" class="button button-ghost" type="button">Clear</button>
                 </div>
               </form>
-              <div id="summary-output" class="summary-output" style="margin-top:16px">
+              <div id="summary-output" class="summary-output u-1b0f499">
                 <p class="empty">Generate a focused summary for the selected chat.</p>
               </div>
 
               <!-- Summary history panel (hidden until there are past summaries) -->
-              <div id="summary-history-panel" hidden style="margin-top:28px;border-top:1px solid var(--line);padding-top:20px">
-                <div class="section-head" style="margin-bottom:12px">
-                  <h4 style="font-size:0.85rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;opacity:0.6;margin:0">Previous Summaries</h4>
+              <div class="u-a4de4cb" id="summary-history-panel" hidden>
+                <div class="section-head u-da12f28">
+                  <h4 class="u-47f6538">Previous Summaries</h4>
                 </div>
                 <div id="summary-history-list" class="summary-history-list"></div>
               </div>
@@ -153,21 +153,21 @@ import ThemeToggle from '../components/ThemeToggle.astro';
 
           <!-- Flashcard panel (replaces chat view when activated) -->
           <div id="flashcard-panel-container" class="panel" hidden>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)">
+            <div class="u-b3a39b6">
               <div>
                 <p class="eyebrow">Memory Layer</p>
                 <h3>Flashcards</h3>
                 <p class="flashcard-copy">Generate clean, topic-grouped recall cards from the selected chat.</p>
               </div>
-              <div style="display:flex;gap:8px;align-items:center">
+              <div class="u-01ef7fc">
                 <span id="flashcard-chat-pill" class="pill">No chat selected</span>
                 <button id="flashcard-close" class="button button-ghost" type="button">Back</button>
               </div>
             </div>
-            <div style="padding:18px">
-              <div class="flashcard-head" style="display:flex;justify-content:space-between;align-items:center">
-                <div style="min-width:0">
-                  <div class="flashcard-stats" style="display:flex;gap:14px;margin-bottom:12px">
+            <div class="u-8e11ed6">
+              <div class="flashcard-head u-13313b1">
+                <div class="u-3922d32">
+                  <div class="flashcard-stats u-21d71ba">
                     <div class="flashcard-stat">
                       <strong id="flashcard-topic-count">0</strong>
                       <span>Topics</span>
@@ -183,7 +183,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
                 </div>
               </div>
 
-              <div class="summary-controls" style="margin-top:12px">
+              <div class="summary-controls u-56f4356">
                 <label class="field">
                   <span>Context chunks</span>
                   <select id="flashcard-results">
@@ -192,13 +192,13 @@ import ThemeToggle from '../components/ThemeToggle.astro';
                     <option value="10">Long</option>
                   </select>
                 </label>
-                <div class="summary-actions" style="margin-top:12px">
+                <div class="summary-actions u-56f4356">
                   <button id="flashcard-clear" class="button button-ghost" type="button">Clear</button>
                 </div>
               </div>
 
-              <p id="flashcard-status" class="status-line flashcard-status" style="margin-top:12px"></p>
-              <div id="flashcard-output" class="flashcard-output" style="margin-top:12px">
+              <p id="flashcard-status" class="status-line flashcard-status u-56f4356"></p>
+              <div id="flashcard-output" class="flashcard-output u-56f4356">
                 <p class="empty">Generate flashcards to see learning cards here.</p>
               </div>
             </div>
@@ -221,9 +221,9 @@ import ThemeToggle from '../components/ThemeToggle.astro';
               <input id="query-input" type="text" placeholder="Ask a question about your notes..." autocomplete="off" />
               <button id="send-btn" class="button button-primary" type="button">Send</button>
             </div>
-            <div id="chat-doc-list" class="chat-doc-list" style="padding:10px 18px;border-top:1px solid var(--line);background:transparent;display:none">
+            <div id="chat-doc-list" class="chat-doc-list u-dd5e476" hidden>
               <strong>Uploaded files</strong>
-              <ul id="chat-doc-list-items" style="margin:8px 0 0;padding-left:18px"></ul>
+              <ul class="u-623b208" id="chat-doc-list-items"></ul>
             </div>
             <p id="status-line" class="status-line"></p>
           </div>
@@ -242,7 +242,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
         </div>
         <div class="modal-body">
           <p id="modal-message">Are you sure?</p>
-          <input id="modal-input" class="input" type="text" style="display:none;margin-top:8px" />
+          <input id="modal-input" class="input u-8a77e5a" type="text" hidden />
           <p id="modal-error" class="modal-error" hidden></p>
         </div>
         <div class="modal-actions">
