@@ -1,8 +1,8 @@
 import logging
 import os
+import re
 import tempfile
 import uuid
-from urllib.parse import urlparse
 
 import httpx
 
@@ -41,9 +41,16 @@ def cleanup_temp_file(file_path: str) -> None:
         logger.warning(f"Failed to remove temp file {file_path}: {e}")
 
 
+def _safe_object_name(filename: str) -> str:
+    """Keep only the basename with a conservative character set (no path traversal)."""
+    base = os.path.basename((filename or "").replace("\\", "/"))
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._") or "file.pdf"
+    return cleaned[:120]
+
+
 def _supabase_presign(filename: str) -> tuple[str, str]:
     bucket = settings.supabase_storage_bucket
-    object_path = f"uploads/{uuid.uuid4().hex}_{filename}"
+    object_path = f"uploads/{uuid.uuid4().hex}_{_safe_object_name(filename)}"
 
     url = f"{settings.supabase_url}/storage/v1/object/upload/sign/{bucket}/{object_path}"
     headers = {
@@ -53,27 +60,24 @@ def _supabase_presign(filename: str) -> tuple[str, str]:
     resp = httpx.post(url, headers=headers, timeout=30)
     resp.raise_for_status()
     result = resp.json()
-    logger.info(f"Supabase presign response: {result}")
     upload_url = result.get("url")
 
+    # Never log the signed URL or response: they contain an upload token.
     if not upload_url:
-        logger.error(f"Supabase signed upload response missing 'url': {result}")
+        logger.error("Supabase signed upload response missing 'url' (keys: %s)", sorted(result))
         raise RuntimeError("Failed to get signed upload URL from Supabase")
 
     if upload_url.startswith("/"):
         upload_url = f"{settings.supabase_url.rstrip('/')}/storage/v1{upload_url}"
 
-    logger.info(f"Supabase upload URL: {upload_url}")
-
-    logger.info(f"Signed upload URL created for {object_path}")
+    logger.info("Signed upload URL created for %s", object_path)
     return upload_url, object_path
 
 
 def _supabase_download(object_path: str) -> str:
     bucket = settings.supabase_storage_bucket
     url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{object_path}"
-    logger.info(f"Download URL: {url}")
-    logger.info(f"Hostname: {urlparse(url).hostname}")
+    logger.info("Downloading %s from Supabase Storage", object_path)
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
     }

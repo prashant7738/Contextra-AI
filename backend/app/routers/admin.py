@@ -25,7 +25,9 @@ class UserBudgetUpdate(BaseModel):
 def _ensure_admin(current_user: UserResponse):
     if not settings.admin_email:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Admin not configured")
-    if not secrets.compare_digest(current_user.email, settings.admin_email):
+    if not secrets.compare_digest(
+        current_user.email.strip().lower().encode(), settings.admin_email.strip().lower().encode()
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
 

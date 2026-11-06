@@ -1,15 +1,16 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, field_validator
 
-
-class UserRegister(BaseModel):
-    name: str
-    email: str
-    password: str
+from app.schemas.user import normalize_email
 
 
 class UserLogin(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=254)
+    password: str = Field(..., max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str) -> str:
+        return normalize_email(value)
 
 
 class TokenResponse(BaseModel):
@@ -20,19 +21,3 @@ class TokenResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
-
-
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: str
-    budget_usd: float
-    spent_usd: float
-
-    model_config = {"from_attributes": True}
-
-
-class UserCreate(BaseModel):
-    name: str
-    email: str
-    password: str

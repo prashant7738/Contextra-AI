@@ -1,5 +1,6 @@
 from math import ceil
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -18,7 +19,9 @@ def get_user_by_id(db: Session, user_id: int) -> User | None:
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    return db.query(User).filter(User.email == email).first()
+    # Case-insensitive so accounts created before emails were normalized still match.
+    normalized = (email or "").strip().lower()
+    return db.query(User).filter(func.lower(User.email) == normalized).first()
 
 
 def create_user(db: Session, name: str, email: str, password: str) -> User:

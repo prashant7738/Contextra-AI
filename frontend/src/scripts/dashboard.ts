@@ -15,6 +15,8 @@
 import { apiFetch } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
 import { buildSummaryRestoreState } from '../utils/summary-history';
+import { escapeHtml } from '../utils/escapeHtml';
+import { renderChatListHtml } from '../utils/chat-list';
 
 (function bootDashboard() {
   let user: any = null;
@@ -244,19 +246,7 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
       return db - da;
     });
 
-    const html = chats
-      .map((chat: any) => {
-        const active = chat.local_id === selectedChatId ? ' chat-item-active' : '';
-        const created = chat.created_at ? formatDate(chat.created_at) : '';
-        return `<div class="chat-item${active}" data-chat-id="${chat.id}" data-local-id="${chat.local_id}" data-created-at="${chat.created_at || ''}">
-          <button class="chat-select" type="button">
-            <span>${chat.name}</span>
-            <small>${created}</small>
-          </button>
-          <button class="chat-menu" type="button" title="Chat actions">⋯</button>
-        </div>`;
-      })
-      .join('');
+    const html = renderChatListHtml(chats, selectedChatId, formatDate);
 
     chatList.innerHTML = html;
     const overlayList = document.getElementById('overlay-chat-list');
@@ -573,12 +563,6 @@ import { buildSummaryRestoreState } from '../utils/summary-history';
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return 'Now';
     return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function escapeHtml(text: string) {
-    const div = document.createElement('div');
-    div.textContent = text ?? '';
-    return div.innerHTML;
   }
 
   async function sendQuery() {
