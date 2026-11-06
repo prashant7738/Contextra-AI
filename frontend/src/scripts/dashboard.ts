@@ -12,7 +12,7 @@
  * requireAuth pre-paint script; the user-presence check here is a defense
  * in depth for malformed localStorage.
  */
-import { apiFetch } from '../utils/api';
+import { apiFetch, extractErrorDetail } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
 import { buildSummaryRestoreState } from '../utils/summary-history';
 import { escapeHtml } from '../utils/escapeHtml';
@@ -193,12 +193,12 @@ import { renderChatListHtml } from '../utils/chat-list';
 
   async function readError(resp: Response): Promise<string> {
     try {
-      const j = await resp.json();
-      return j.detail || JSON.stringify(j);
+      return extractErrorDetail(await resp.json(), resp.status);
     } catch {
-      return resp.statusText;
+      return resp.statusText || `Request failed with status ${resp.status}`;
     }
   }
+
 
   async function loadChats() {
     try {

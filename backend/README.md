@@ -495,6 +495,11 @@ curl -X POST "http://localhost:8000/cron/run" \
 
 ---
 
+## Health Endpoints
+
+- `GET /health` – liveness; never touches the database or OpenAI.
+- `GET /health/ready` – readiness; returns `503` when the database is unreachable.
+
 ## Root Endpoint
 
 ### GET `/`
@@ -507,8 +512,7 @@ curl "http://localhost:8000/"
 **Response:**
 ```json
 {
-  "message": "Hello from Second Brain AI",
-  "step": 2
+  "message": "Hello from Contextra AI"
 }
 ```
 

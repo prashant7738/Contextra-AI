@@ -11,7 +11,7 @@ describe('startKeepAlive', () => {
   });
 
   it('pings /health immediately and every 2 minutes', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const { startKeepAlive } = await import('../../src/scripts/keep-alive');
@@ -30,7 +30,7 @@ describe('startKeepAlive', () => {
   });
 
   it('swallows fetch errors instead of throwing', async () => {
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
       throw new Error('network down');
     });
     vi.stubGlobal('fetch', fetchMock);

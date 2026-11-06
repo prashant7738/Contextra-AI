@@ -39,9 +39,11 @@ Keep projects, courses, and research silos separate. Each chat has its own docum
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + pytest
+# Optional OCR for scanned PDFs (installs CPU PyTorch, needs ~2 GB RAM):
+# pip install -r requirements-ocr.txt
 cp .env.example .env   # add DATABASE_URL, OPENAI_API_KEY, SECRET_KEY, ADMIN_EMAIL
-alembic upgrade head
+alembic upgrade head   # the schema is managed only by Alembic
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -63,6 +65,28 @@ npm run dev
 **Optional:** `DAILY_BUDGET_USD` (global AI spend cap per UTC day, default `0.25`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEFAULT_USER_BUDGET_USD` (monthly per-user OpenAI spend cap in USD, default `1.0`)
 
 Full reference in `backend/.env.example` and `frontend/.env.example`.
+
+> **Admin account:** admin rights belong to whoever registers `ADMIN_EMAIL` (there is no email verification). Register that account yourself right after the first deploy.
+
+---
+
+## Tests
+
+```bash
+cd backend && python -m pytest -q        # unit tests; no database needed
+# Integration tests run too when DATABASE_URL points at a migrated
+# PostgreSQL + pgvector database (otherwise they are skipped).
+
+cd frontend && npm test && npm run check && npm run build
+```
+
+CI (`.github/workflows/ci.yml`) runs all of the above on every pull request, including `alembic upgrade head` against a fresh pgvector database.
+
+## Deployment
+
+- **Backend (Render):** `render.yaml` builds with `pip install -r requirements.txt` and starts with `alembic upgrade head && uvicorn ...`, so migrations are applied on every deploy. If the service was created by hand rather than from the blueprint, set the same Start Command in the Render dashboard.
+- **Frontend (Vercel):** static Astro build (`npm run build`, output `dist`).
+- Health checks: `GET /health` (liveness, no dependencies) and `GET /health/ready` (checks the database).
 
 ---
 

@@ -134,6 +134,30 @@ export async function apiFetch(
   }
 }
 
+/**
+ * Turn a FastAPI error body into a readable message. `detail` is a string for
+ * HTTPException, and a list of `{loc, msg}` objects for 422 validation errors.
+ */
+export function extractErrorDetail(payload: unknown, status: number): string {
+  const fallback = `Request failed with status ${status}`;
+  if (typeof payload === 'string') return payload || fallback;
+  if (!payload || typeof payload !== 'object' || !('detail' in payload)) return fallback;
+  const detail = (payload as { detail: unknown }).detail;
+  if (typeof detail === 'string') return detail || fallback;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (item && typeof item === 'object' && 'msg' in item) {
+          return String((item as { msg: unknown }).msg).replace(/^Value error, /, '');
+        }
+        return typeof item === 'string' ? item : '';
+      })
+      .filter(Boolean);
+    return messages.length ? messages.join('; ') : fallback;
+  }
+  return fallback;
+}
+
 async function makeRequest<T>(
   endpoint: string,
   options: ApiRequestOptions = {},
@@ -155,14 +179,7 @@ async function makeRequest<T>(
     }
 
     if (!response.ok) {
-      const detail =
-        (payload &&
-          typeof payload === 'object' &&
-          'detail' in (payload as Record<string, unknown>) &&
-          String((payload as Record<string, unknown>).detail)) ||
-        (typeof payload === 'string' ? payload : '') ||
-        `Request failed with status ${response.status}`;
-      return { error: detail, status: response.status };
+      return { error: extractErrorDetail(payload, response.status), status: response.status };
     }
 
     return { data: payload as T, status: response.status };
@@ -200,9 +217,6 @@ export const apiClient = {
     }),
 
   getMe: () => makeRequest('/auth/me', { method: 'GET' }),
-
-  getUsers: (skip: number = 0, limit: number = 100) =>
-    makeRequest(`/users/?skip=${skip}&limit=${limit}`, { method: 'GET' }),
 
   get: <T = unknown>(endpoint: string, options?: ApiRequestOptions) =>
     makeRequest<T>(endpoint, { ...options, method: 'GET' }),

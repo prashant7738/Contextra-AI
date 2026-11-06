@@ -4,7 +4,6 @@ import uuid
 from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
-from pgvector.sqlalchemy import Vector
 
 from app.core.embeddings import EMBEDDING_MODEL
 from app.database import SessionLocal
@@ -55,33 +54,23 @@ def query_similar(
 ) -> dict[str, Any]:
     db = get_db()
     try:
-        # Use the <=> operator directly with a literal vector
-        from sqlalchemy import text
-        query_vector_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-        
-        stmt = select(Embedding).order_by(text(f"embedding <=> '{query_vector_str}'::vector")).limit(n_results)
-        
+        # pgvector's <=> operator with a bound parameter; the database returns
+        # the cosine distance alongside each row.
+        distance = Embedding.embedding.cosine_distance(query_embedding).label("distance")
+        stmt = select(Embedding, distance).order_by(distance).limit(n_results)
+
         conditions = []
         if user_id is not None:
             conditions.append(Embedding.user_id == user_id)
         if chat_id is not None:
             conditions.append(Embedding.chat_id == chat_id)
-        
         if conditions:
             stmt = stmt.where(and_(*conditions))
-        
-        results = db.execute(stmt).scalars().all()
-        
-        # Compute cosine distance in Python
-        import numpy as np
-        query_vec = np.array(query_embedding)
-        distances = []
-        for r in results:
-            emb_vec = np.array(r.embedding)
-            # Cosine distance = 1 - cosine similarity
-            cos_sim = np.dot(query_vec, emb_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(emb_vec))
-            distances.append(float(1 - cos_sim))
-        
+
+        rows = db.execute(stmt).all()
+        results = [row[0] for row in rows]
+        distances = [float(row[1]) for row in rows]
+
         return {
             "ids": [[str(r.id) for r in results]],
             "documents": [[r.content for r in results]],
@@ -94,7 +83,7 @@ def query_similar(
                 }
                 for r in results
             ]],
-            "distances": [distances] if results else [[]],
+            "distances": [distances],
         }
     finally:
         db.close()

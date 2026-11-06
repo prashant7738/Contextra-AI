@@ -18,7 +18,7 @@ describe('apiClient.get — auth, refresh, single-flight', () => {
 
   it('sends Authorization header when access token is present', async () => {
     localStorage.setItem('access_token', 'tok');
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -31,7 +31,7 @@ describe('apiClient.get — auth, refresh, single-flight', () => {
 
     expect(res.status).toBe(200);
     expect(res.data).toEqual({ ok: true });
-    const [, init] = fetchMock.mock.calls[0];
+    const init = fetchMock.mock.calls[0][1]!;
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
   });
 
@@ -83,7 +83,7 @@ describe('apiClient.get — auth, refresh, single-flight', () => {
     localStorage.setItem('refresh_token', 'refresh');
 
     let refreshCalls = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo, _init?: RequestInit) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/auth/refresh')) {
         refreshCalls += 1;
@@ -142,7 +142,7 @@ describe('apiClient.get — auth, refresh, single-flight', () => {
   });
 
   it('upload() sends FormData without setting Content-Type', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -155,8 +155,23 @@ describe('apiClient.get — auth, refresh, single-flight', () => {
     fd.append('file', new Blob(['hi']), 'a.txt');
     await apiClient.upload('/upload', fd);
 
-    const [, init] = fetchMock.mock.calls[0];
+    const init = fetchMock.mock.calls[0][1]!;
     expect(init.body).toBe(fd);
     expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+  });
+});
+
+describe('extractErrorDetail', () => {
+  it('reads string, validation-list and missing details', async () => {
+    const { extractErrorDetail } = await import('../../src/utils/api');
+    expect(extractErrorDetail({ detail: 'Email already registered' }, 400)).toBe('Email already registered');
+    expect(
+      extractErrorDetail(
+        { detail: [{ loc: ['body', 'email'], msg: 'Value error, Enter a valid email address' }, { msg: 'Too short' }] },
+        422,
+      ),
+    ).toBe('Enter a valid email address; Too short');
+    expect(extractErrorDetail(undefined, 503)).toBe('Request failed with status 503');
+    expect(extractErrorDetail('Bad gateway', 502)).toBe('Bad gateway');
   });
 });
