@@ -175,3 +175,72 @@ describe('extractErrorDetail', () => {
     expect(extractErrorDetail('Bad gateway', 502)).toBe('Bad gateway');
   });
 });
+
+describe('refresh edge cases and logout', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('keeps the session when another tab already rotated the refresh token', async () => {
+    localStorage.setItem('access_token', 'expired');
+    localStorage.setItem('refresh_token', 'old');
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/auth/refresh')) {
+        // Meanwhile the other tab stored fresh tokens.
+        localStorage.setItem('access_token', 'from-other-tab');
+        localStorage.setItem('refresh_token', 'new');
+        return new Response(JSON.stringify({ detail: 'used' }), { status: 401, headers: { 'content-type': 'application/json' } });
+      }
+      const auth = new Headers(init?.headers).get('Authorization');
+      return auth === 'Bearer from-other-tab'
+        ? new Response(JSON.stringify({ ok: 1 }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : new Response(JSON.stringify({ detail: 'expired' }), { status: 401, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await loadApi();
+    const res = await apiClient.get('/protected');
+    expect(res.status).toBe(200);
+    expect(localStorage.getItem('refresh_token')).toBe('new');
+  });
+
+  it('does not sign the user out when the refresh request fails on the network', async () => {
+    localStorage.setItem('access_token', 'expired');
+    localStorage.setItem('refresh_token', 'r');
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith('/auth/refresh')) throw new TypeError('Failed to fetch');
+      return new Response(JSON.stringify({ detail: 'expired' }), { status: 401, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiClient } = await loadApi();
+    await apiClient.get('/protected');
+    expect(localStorage.getItem('refresh_token')).toBe('r');
+  });
+
+  it('logout revokes server-side and clears tokens and cached study data', async () => {
+    localStorage.setItem('access_token', 'a');
+    localStorage.setItem('refresh_token', 'r');
+    localStorage.setItem('current_user', '{"id":1,"email":"x"}');
+    localStorage.setItem('dashboard_summary_cache_1_2', '{}');
+    localStorage.setItem('dashboard_flashcards_cache_1_2', '{}');
+    localStorage.setItem('dashboard_left_width', '300');
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { logout } = await loadApi();
+    logout();
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/auth\/logout$/);
+    expect(JSON.parse(String(init!.body))).toEqual({ refresh_token: 'r' });
+    expect(init!.keepalive).toBe(true);
+    expect(localStorage.getItem('access_token')).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
+    expect(localStorage.getItem('current_user')).toBeNull();
+    expect(localStorage.getItem('dashboard_summary_cache_1_2')).toBeNull();
+    expect(localStorage.getItem('dashboard_flashcards_cache_1_2')).toBeNull();
+    expect(localStorage.getItem('dashboard_left_width')).toBe('300');
+  });
+});

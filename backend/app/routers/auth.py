@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.user import UserCreate, UserResponse
@@ -26,6 +26,13 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
 def refresh(request: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Refresh access token using refresh token."""
     return auth_service.refresh_access_token(db, request.refresh_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(request: RefreshTokenRequest, db: Session = Depends(get_db)):
+    """Revoke a refresh token (sign out this session). Always 204."""
+    auth_service.logout(db, request.refresh_token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/me", response_model=UserResponse)

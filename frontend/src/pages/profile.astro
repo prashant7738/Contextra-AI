@@ -218,7 +218,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
     </style>
 
     <script>
-      import { apiClient } from '../utils/api';
+      import { apiClient, logout } from '../utils/api';
 
       (function () {
         let user: { name?: string; email?: string; id?: number | string; budget_usd?: number; spent_usd?: number } | null = null;
@@ -264,7 +264,7 @@ import ThemeToggle from '../components/ThemeToggle.astro';
         });
 
         document.getElementById('profile-logout-btn')?.addEventListener('click', () => {
-          ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));
+          logout();
           window.location.replace('/login');
         });
       })();

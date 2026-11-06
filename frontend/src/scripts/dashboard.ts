@@ -12,7 +12,7 @@
  * requireAuth pre-paint script; the user-presence check here is a defense
  * in depth for malformed localStorage.
  */
-import { apiFetch, extractErrorDetail } from '../utils/api';
+import { apiFetch, extractErrorDetail, logout } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
 import { buildSummaryRestoreState } from '../utils/summary-history';
 import { escapeHtml } from '../utils/escapeHtml';
@@ -1308,7 +1308,7 @@ import { renderChatListHtml } from '../utils/chat-list';
   flashcardClearBtn?.addEventListener('click', clearFlashcards);
 
   logoutBtn?.addEventListener('click', () => {
-    ['access_token', 'refresh_token', 'current_user'].forEach((k) => localStorage.removeItem(k));
+    logout();
     window.location.replace('/login');
   });
 

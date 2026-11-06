@@ -44,6 +44,11 @@ function composeSignals(signals: Array<AbortSignal | undefined>): AbortSignal | 
 // (each would invalidate the previous refresh_token on the server).
 let inFlightRefresh: Promise<boolean> | null = null;
 
+function rotatedElsewhere(sentToken: string): boolean {
+  const current = AuthService.getRefreshToken();
+  return Boolean(current && current !== sentToken);
+}
+
 async function refreshTokens(): Promise<boolean> {
   if (inFlightRefresh) return inFlightRefresh;
   const refreshToken = AuthService.getRefreshToken();
@@ -61,6 +66,9 @@ async function refreshTokens(): Promise<boolean> {
           signal: controller.signal,
         });
         if (!response.ok) {
+          // Another tab may have rotated the shared refresh token first; the
+          // server then rejects ours, but fresh tokens are already stored.
+          if (rotatedElsewhere(refreshToken)) return true;
           AuthService.clearTokens();
           return false;
         }
@@ -71,8 +79,8 @@ async function refreshTokens(): Promise<boolean> {
         clearTimeout(timer);
       }
     } catch {
-      AuthService.clearTokens();
-      return false;
+      // Network failure or timeout: keep the session; the next request retries.
+      return rotatedElsewhere(refreshToken);
     } finally {
       inFlightRefresh = null;
     }
@@ -237,6 +245,33 @@ export const apiClient = {
   upload: <T = unknown>(endpoint: string, form: FormData, options?: ApiRequestOptions) =>
     makeRequest<T>(endpoint, { ...options, method: 'POST', body: form }),
 };
+
+/** Locally cached study artifacts (summaries, flashcards) that must not outlive a session. */
+const SESSION_CACHE_KEY = /^dashboard_(summary|flashcards)_/;
+
+/**
+ * Sign out: revoke the refresh token on the server (best effort) and clear
+ * every token and cached study artifact from this browser.
+ */
+export function logout(): void {
+  const refreshToken = AuthService.getRefreshToken();
+  if (refreshToken) {
+    // keepalive lets the request finish even though the page navigates away.
+    fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      keepalive: true,
+    }).catch(() => undefined);
+  }
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? '');
+    keys.filter((key) => SESSION_CACHE_KEY.test(key)).forEach((key) => localStorage.removeItem(key));
+  } catch {
+    /* storage unavailable */
+  }
+  AuthService.clearTokens();
+}
 
 // Test-only hook: reset the in-flight refresh promise so unit tests are deterministic.
 // Not exported through the package barrel; consumers must import explicitly.
