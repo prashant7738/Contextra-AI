@@ -1,7 +1,14 @@
 // @ts-nocheck
 /**
- * Dashboard runtime — bootstraps chat list, messages, composer, document upload,
- * detailed summary panel, and flashcards. Loaded once per dashboard page render.
+ * Dashboard runtime — wires the DOM for the chat list, messages, composer,
+ * document upload, summary panel and flashcards. Loaded once per dashboard page.
+ *
+ * Logic that does not need the DOM lives in typed, tested modules:
+ *   - dashboard/render.ts  HTML builders (all escaping/sanitizing happens there)
+ *   - dashboard/cache.ts   per-user localStorage cache of generated artifacts
+ *   - dashboard/ingest.ts  PDF upload + ingestion polling
+ * This file still opts out of type checking (`@ts-nocheck`) because of its
+ * untyped DOM lookups; move further logic into typed modules when touching it.
  *
  * Behavior preserved verbatim from the previous inline <script>, with these
  * surgical swaps:
@@ -12,8 +19,19 @@
  * requireAuth pre-paint script; the user-presence check here is a defense
  * in depth for malformed localStorage.
  */
-import { apiFetch, extractErrorDetail, logout } from '../utils/api';
+import { apiFetch, logout } from '../utils/api';
 import { renderMarkdown } from '../utils/markdown';
+import { createChatCache } from './dashboard/cache';
+import { pollIngestionTask, readError, uploadDirect, uploadViaPresign } from './dashboard/ingest';
+import {
+  chatReferencesHtml,
+  flashcardsHtml,
+  formatDateTime,
+  messagesHtml,
+  summaryCardHtml,
+  summaryHistoryHtml,
+  uploadPreviewHtml,
+} from './dashboard/render';
 import { buildSummaryRestoreState } from '../utils/summary-history';
 import { escapeHtml } from '../utils/escapeHtml';
 import { renderChatListHtml } from '../utils/chat-list';
@@ -102,55 +120,11 @@ import { renderChatListHtml } from '../utils/chat-list';
   const flashcardExpanded = new Set<number>();
   let topbarSyncRaf = 0;
 
-  function getChatCacheKey(kind: 'summary' | 'flashcards', chatId: number) {
-    return `dashboard_${kind}_cache_${user.id}_${chatId}`;
-  }
-
-  function getSummaryHistoryKey(chatId: number) {
-    return `dashboard_summary_history_${user.id}_${chatId}`;
-  }
-
-  function readChatCache(kind: 'summary' | 'flashcards', chatId: number) {
-    try {
-      const raw = localStorage.getItem(getChatCacheKey(kind, chatId));
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  /** Returns the full list of saved summaries for this chat (newest first). */
-  function readSummaryHistory(chatId: number): any[] {
-    try {
-      const raw = localStorage.getItem(getSummaryHistoryKey(chatId));
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function writeChatCache(kind: 'summary' | 'flashcards', chatId: number, value: any) {
-    try {
-      localStorage.setItem(getChatCacheKey(kind, chatId), JSON.stringify(value));
-    } catch {
-      /* ignore storage failures */
-    }
-  }
-
-  /**
-   * Appends a new summary entry to the per-chat history array (max 20 entries).
-   * The entry is prepended so index 0 is always the newest.
-   */
-  function appendSummaryHistory(chatId: number, entry: { data: any; topic: string; nResults: number; updatedAt: string }) {
-    try {
-      const history = readSummaryHistory(chatId);
-      history.unshift(entry);
-      const trimmed = history.slice(0, 20);
-      localStorage.setItem(getSummaryHistoryKey(chatId), JSON.stringify(trimmed));
-    } catch {
-      /* ignore storage failures */
-    }
-  }
+  const chatCache = createChatCache(user.id);
+  const readChatCache = chatCache.read;
+  const writeChatCache = chatCache.write;
+  const readSummaryHistory = (chatId: number) => chatCache.readSummaryHistory(chatId);
+  const appendSummaryHistory = (chatId: number, entry: any) => chatCache.appendSummaryHistory(chatId, entry);
 
   function setConnection(text: string, tone?: string) {
     if (!connectionPill) return;
@@ -190,15 +164,6 @@ import { renderChatListHtml } from '../utils/chat-list';
       syncTopbarChrome();
     });
   }
-
-  async function readError(resp: Response): Promise<string> {
-    try {
-      return extractErrorDetail(await resp.json(), resp.status);
-    } catch {
-      return resp.statusText || `Request failed with status ${resp.status}`;
-    }
-  }
-
 
   async function loadChats() {
     try {
@@ -508,25 +473,7 @@ import { renderChatListHtml } from '../utils/chat-list';
       messageStream.innerHTML = `<div class="empty-state"><h3>Start a conversation</h3><p>Ask a question about your notes to get started.</p></div>`;
       return;
     }
-    messageStream.innerHTML = messages
-      .map(
-        (msg: any) => `
-        <article class="turn">
-          <div class="turn-meta">${formatDate(msg.created_at)}</div>
-          <div class="turn-card">
-            <div class="bubble bubble-user">
-              <p class="bubble-label">You</p>
-              <p>${escapeHtml(msg.user_message)}</p>
-            </div>
-            <div class="bubble bubble-bot">
-              <p class="bubble-label">Assistant</p>
-              <div class="bot-content">${renderMarkdown(msg.bot_response || '')}</div>
-            </div>
-          </div>
-        </article>
-      `,
-      )
-      .join('');
+    messageStream.innerHTML = messagesHtml(messages, formatDate);
     messageStream.scrollTop = messageStream.scrollHeight;
 
     renderChatDocuments(chatId).catch((e) => console.debug('Could not render chat documents', e));
@@ -558,12 +505,7 @@ import { renderChatListHtml } from '../utils/chat-list';
     }
   }
 
-  function formatDate(iso: string) {
-    if (!iso) return 'Now';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return 'Now';
-    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
+  const formatDate = formatDateTime;
 
   async function sendQuery() {
     if (!queryInput || !selectedChatId) return;
@@ -633,23 +575,7 @@ import { renderChatListHtml } from '../utils/chat-list';
     }
   }
 
-  function renderReferenceDetails(references: any[]) {
-    if (!Array.isArray(references) || references.length === 0) return '';
-    const items = references
-      .map(
-        (ref: any) => `
-          <li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>
-        `,
-      )
-      .join('');
-
-    return `
-      <details class="summary-sources chat-sources">
-        <summary class="summary-sources-toggle">References</summary>
-        <ul>${items}</ul>
-      </details>
-    `;
-  }
+  const renderReferenceDetails = chatReferencesHtml;
 
   const usePresignUpload = (import.meta.env.PUBLIC_UPLOAD_METHOD as string | undefined) === 'presign';
 
@@ -668,12 +594,15 @@ import { renderChatListHtml } from '../utils/chat-list';
       let taskId: number;
 
       if (usePresignUpload) {
-        taskId = await uploadViaPresign(file);
+        taskId = await uploadViaPresign(file, user.id, selectedChatId);
       } else {
-        taskId = await uploadDirect(file);
+        taskId = await uploadDirect(file, user.id, selectedChatId);
       }
 
-      await pollIngestionTask(taskId);
+      const done = await pollIngestionTask(taskId, user.id, {
+        onProgress: (seconds) => setStatus(`Processing... (${seconds}s)`, 'warning'),
+      });
+      setStatus(`Uploaded — ${done.chunks_count} chunks indexed`, 'success');
 
       if (selectedUploadFile === currentSelection) {
         clearUploadSelection(true);
@@ -691,65 +620,6 @@ import { renderChatListHtml } from '../utils/chat-list';
     } finally {
       if (uploadBtn) uploadBtn.disabled = false;
     }
-  }
-
-  async function uploadDirect(file: File): Promise<number> {
-    const formData = new FormData();
-    formData.append('files', file);
-    const resp = await apiFetch(
-      `/documents/ingest/direct?user_id=${user.id}&chat_id=${selectedChatId}`,
-      { method: 'POST', body: formData, timeoutMs: 300_000 },
-    );
-    if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
-    const data = await resp.json();
-    return data.task_id;
-  }
-
-  async function uploadViaPresign(file: File): Promise<number> {
-    const presignResp = await apiFetch(
-      `/documents/ingest/presign?user_id=${user.id}&chat_id=${selectedChatId}`,
-      { method: 'POST', body: JSON.stringify({ filename: file.name }) },
-    );
-    if (!presignResp.ok) throw new Error(`${presignResp.status}: ${await readError(presignResp)}`);
-    const { task_id, upload_url } = await presignResp.json();
-
-    const uploadResp = await fetch(upload_url, {
-      method: 'PUT',
-      body: file,
-    });
-    if (!uploadResp.ok) throw new Error(`Storage upload failed: ${uploadResp.status}`);
-
-    const confirmResp = await apiFetch(
-      `/documents/ingest/${task_id}/confirm?user_id=${user.id}`,
-      { method: 'POST' },
-    );
-    if (!confirmResp.ok) throw new Error(`${confirmResp.status}: ${await readError(confirmResp)}`);
-
-    return task_id;
-  }
-
-  async function pollIngestionTask(taskId: number): Promise<void> {
-    const maxAttempts = 300;
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const resp = await apiFetch(
-        `/documents/ingest/status/${taskId}?user_id=${user.id}`,
-        { timeoutMs: 10_000 },
-      );
-      if (!resp.ok) throw new Error(`${resp.status}: ${await readError(resp)}`);
-      const data = await resp.json();
-      if (data.status === 'completed') {
-        setStatus(`Uploaded — ${data.chunks_count} chunks indexed`, 'success');
-        return;
-      }
-      if (data.status === 'failed') {
-        throw new Error(data.error_message || 'Processing failed');
-      }
-      if (i > 0 && i % 10 === 0) {
-        setStatus(`Processing... (${Math.round(i * 2)}s)`, 'warning');
-      }
-    }
-    throw new Error('Processing timed out after 10 minutes');
   }
 
   async function generateSummary(ev: Event) {
@@ -821,50 +691,7 @@ import { renderChatListHtml } from '../utils/chat-list';
 
   function renderSummary(data: any) {
     if (!summaryOutput) return;
-
-    const title = escapeHtml(data.title || data.topic || 'Summary');
-
-    let bodyHtml = '';
-    if (data.sections && data.sections.length > 0) {
-      bodyHtml = data.sections
-        .map(
-          (section: any) => `
-        <div class="summary-section">
-          <h4 class="summary-section-heading">${escapeHtml(section.heading || 'Section')}</h4>
-          <ul class="summary-section-list">
-            ${(section.items || []).map((item: string) => `<li>${escapeHtml(item)}</li>`).join('')}
-          </ul>
-        </div>
-      `,
-        )
-        .join('');
-    } else if (data.summary) {
-      bodyHtml = `<div class="summary-md-body">${renderMarkdown(data.summary)}</div>`;
-    }
-
-    const references = (data.references || [])
-      .map(
-        (ref: any) => `
-      <li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>
-    `,
-      )
-      .join('');
-
-    summaryOutput.innerHTML = `
-      <article class="summary-card">
-        <div class="summary-card-head">
-          <div class="summary-card-meta">
-            <span class="pill">${escapeHtml(data.topic || 'all')}</span>
-            <span class="pill">${Number(data.chunks_used || 0)} chunks</span>
-          </div>
-          <h3 class="summary-card-title">${title}</h3>
-        </div>
-        <div class="summary-card-body">
-          ${bodyHtml}
-        </div>
-        ${references ? `<details class="summary-sources"><summary class="summary-sources-toggle">References</summary><ul>${references}</ul></details>` : ''}
-      </article>
-    `;
+    summaryOutput.innerHTML = summaryCardHtml(data);
   }
 
   /**
@@ -883,57 +710,7 @@ import { renderChatListHtml } from '../utils/chat-list';
     }
 
     historyPanel.hidden = false;
-    historyList.innerHTML = entries
-      .map((entry: any, idx: number) => {
-        const d = entry.data || {};
-        const entryTitle = escapeHtml(d.title || d.topic || entry.topic || 'Summary');
-        const topicPill = escapeHtml(d.topic || entry.topic || 'all');
-        const when = entry.updatedAt ? new Date(entry.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-
-        let bodyHtml = '';
-        if (d.sections && d.sections.length > 0) {
-          bodyHtml = d.sections
-            .map(
-              (section: any) => `
-              <div class="summary-section">
-                <h4 class="summary-section-heading">${escapeHtml(section.heading || 'Section')}</h4>
-                <ul class="summary-section-list">
-                  ${(section.items || []).map((item: string) => `<li>${escapeHtml(item)}</li>`).join('')}
-                </ul>
-              </div>
-            `,
-            )
-            .join('');
-        } else if (d.summary) {
-          bodyHtml = `<div class="summary-md-body">${renderMarkdown(d.summary)}</div>`;
-        }
-
-        const refs = (d.references || [])
-          .map((ref: any) => `<li>${escapeHtml(ref.filename || 'Unknown source')} <small>p.${ref.page || '-'}</small></li>`)
-          .join('');
-
-        return `
-          <details class="summary-history-item" data-history-index="${idx}">
-            <summary class="summary-history-toggle">
-              <div class="summary-history-toggle-inner">
-                <div class="summary-history-meta">
-                  <span class="pill pill-sm">${topicPill}</span>
-                  <span class="summary-history-when">${when}</span>
-                </div>
-                <span class="summary-history-title">${entryTitle}</span>
-              </div>
-              <span class="summary-history-chevron" aria-hidden="true">›</span>
-            </summary>
-            <div class="summary-history-body">
-              <article class="summary-card summary-card-sm">
-                <div class="summary-card-body">${bodyHtml}</div>
-                ${refs ? `<details class="summary-sources"><summary class="summary-sources-toggle">References</summary><ul>${refs}</ul></details>` : ''}
-              </article>
-            </div>
-          </details>
-        `;
-      })
-      .join('');
+    historyList.innerHTML = summaryHistoryHtml(entries);
   }
 
   function restoreSummaryFromCache(chatId: number) {
@@ -1014,40 +791,7 @@ import { renderChatListHtml } from '../utils/chat-list';
       return;
     }
 
-    flashcardOutput.innerHTML = `
-      <div class="flashcard-grid">
-        ${cards
-          .map((card: any, index: number) => {
-            const refs = (card.references || [])
-              .map(
-                (ref: any) => `
-              <li>${escapeHtml(ref.filename || 'Source')} <small>p.${ref.page || '-'}</small></li>
-            `,
-              )
-              .join('');
-
-            return `
-              <article class="flashcard-card" data-card-index="${index}">
-                <div class="flashcard-summary" role="button" tabindex="0" data-toggle-index="${index}">
-                  <div class="flashcard-topline">
-                    <strong class="flashcard-topic">${escapeHtml(card.topic || 'Topic')}</strong>
-                    <span class="flashcard-badge">Card ${index + 1}</span>
-                  </div>
-                  <p class="flashcard-summary-text">${escapeHtml(card.summary || '')}</p>
-                  <span class="flashcard-hint">Expand</span>
-                </div>
-                <div class="flashcard-details">
-                  <div class="flashcard-details-inner">
-                    <p class="flashcard-explanation">${escapeHtml(card.explanation || 'No explanation')}</p>
-                    ${refs ? `<details class="flashcard-sources"><summary class="flashcard-sources-toggle">References</summary><ul>${refs}</ul></details>` : ''}
-                  </div>
-                </div>
-              </article>
-            `;
-          })
-          .join('')}
-      </div>
-    `;
+    flashcardOutput.innerHTML = flashcardsHtml(cards);
 
     flashcardOutput.querySelectorAll('[data-toggle-index]').forEach((btn: any) => {
       const toggle = () => {
@@ -1058,6 +802,7 @@ import { renderChatListHtml } from '../utils/chat-list';
         if (card) card.classList.toggle('flashcard-card-open', flashcardExpanded.has(index));
         const hint = btn.querySelector('.flashcard-hint');
         if (hint) hint.textContent = flashcardExpanded.has(index) ? 'Collapse' : 'Expand';
+        btn.setAttribute('aria-expanded', String(flashcardExpanded.has(index)));
       };
       btn.addEventListener('click', toggle);
       btn.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1112,18 +857,6 @@ import { renderChatListHtml } from '../utils/chat-list';
     if (!keepStatus) setStatus('No file selected', 'warning');
   }
 
-  function formatFileSize(bytes: number) {
-    if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let size = bytes;
-    let unit = 0;
-    while (size >= 1024 && unit < units.length - 1) {
-      size /= 1024;
-      unit += 1;
-    }
-    return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
-  }
-
   function renderUploadSelection(state: 'idle' | 'ready' | 'uploading') {
     if (!uploadPreview) return;
     if (!selectedUploadFile) {
@@ -1135,24 +868,7 @@ import { renderChatListHtml } from '../utils/chat-list';
 
     uploadPreview.hidden = false;
     uploadPreview.dataset.state = state;
-    uploadPreview.innerHTML = `
-      <div class="upload-preview-card">
-        <div class="upload-preview-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <path d="M9 14h6"/>
-            <path d="M9 18h6"/>
-          </svg>
-        </div>
-        <div class="upload-preview-copy">
-          <span class="upload-preview-label">${state === 'uploading' ? 'Uploading PDF' : 'Selected PDF'}</span>
-          <strong class="upload-preview-name">${escapeHtml(selectedUploadFile.name)}</strong>
-          <span class="upload-preview-meta">${formatFileSize(selectedUploadFile.size)}${state === 'uploading' ? ' · in progress' : ''}</span>
-        </div>
-        <button class="upload-preview-remove" type="button" data-upload-remove>${state === 'uploading' ? 'Pending' : 'Remove'}</button>
-      </div>
-    `;
+    uploadPreview.innerHTML = uploadPreviewHtml(selectedUploadFile, state);
 
     uploadPreview.querySelector('[data-upload-remove]')?.addEventListener('click', (ev: any) => {
       ev.preventDefault();
