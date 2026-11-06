@@ -26,7 +26,7 @@ Keep projects, courses, and research silos separate. Each chat has its own docum
 
 | Frontend | Backend | AI | Database |
 |---|---|---|---|
-| Astro 6 + React 18 | FastAPI (Python 3.12) | OpenAI gpt-6-luna (chat, summaries, flashcards, quizzes) | PostgreSQL + pgvector |
+| Astro 6 + React 18 | FastAPI (Python 3.12) | OpenAI gpt-6-luna (chat, summaries, flashcards) | PostgreSQL + pgvector |
 | TypeScript, Vite | SQLAlchemy, Alembic | OpenAI text-embedding-3-small embeddings | Supabase |
 | Custom design system | JWT auth, bcrypt | Hybrid OCR (fitz + EasyOCR) | — |
 
