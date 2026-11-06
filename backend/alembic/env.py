@@ -7,7 +7,7 @@ from alembic import context
 
 from app.database import Base
 from app.settings import settings
-from app.models import user, document
+import app.models  # noqa: F401 - register every model for autogenerate
 
 config = context.config
 # Escape % for configparser (e.g. URL-encoded password characters like %23)

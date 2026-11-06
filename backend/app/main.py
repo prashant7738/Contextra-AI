@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.routers import admin, auth, chat, cron, documents, health
 from app.services.task_recovery import fail_interrupted_tasks
 from app.settings import settings
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Contextra AI backend")
     # Log only whether the key is present, never its value.
     logger.info("OpenAI API key present: %s", bool(settings.openai_api_key))
-    Base.metadata.create_all(bind=engine)
+    # Schema is managed by Alembic (`alembic upgrade head` runs before start).
     try:
         with SessionLocal() as db:
             fail_interrupted_tasks(db)
