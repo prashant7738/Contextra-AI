@@ -2,6 +2,7 @@ import logging
 import os
 
 import fitz
+from fastapi import HTTPException
 
 from app.database import SessionLocal
 from app.models.ingestion_task import IngestionTask
@@ -17,6 +18,20 @@ def _strip_nul_chars(text: str) -> str:
     if not text:
         return ""
     return text.replace("\x00", "")
+
+
+GENERIC_INGESTION_ERROR = "Processing failed. Please try uploading the file again."
+
+
+def user_facing_error(exc: Exception) -> str:
+    """Message safe to show the user; internal details stay in the server log."""
+    if isinstance(exc, HTTPException):  # e.g. AI budget reached (429)
+        return str(exc.detail)
+    if isinstance(exc, ValueError) and str(exc):
+        return str(exc)
+    if isinstance(exc, fitz.FileDataError):
+        return "The file could not be read as a PDF."
+    return GENERIC_INGESTION_ERROR
 
 
 def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
@@ -51,7 +66,6 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         with open(local_path, "rb") as f:
             contents = f.read()
 
-        logger.info(f"Task {task_id}: opening PDF with fitz.open()");
         doc = fitz.open(stream=contents, filetype="pdf")
 
         full_text = ""
@@ -73,6 +87,10 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
             })
 
         logger.info(f"Extraction done: {extraction_stats}")
+        if not full_text.strip():
+            raise ValueError(
+                "No readable text was found in this PDF. Scanned documents are not supported yet."
+            )
 
         logger.info(f"Task {task_id}: creating document record")
         document = create_document(db, task.user_id, task.chat_id, task.filename, full_text)
@@ -92,15 +110,18 @@ def process_ingestion_task(task_id: int, use_ocr: bool = False) -> None:
         db.commit()
 
     except Exception as e:
-        logger.exception(e)
+        logger.exception("Ingestion task %s failed", task_id)
         if task is not None:
             try:
+                db.rollback()
                 task.status = "failed"
-                task.error_message = str(e)
+                task.error_message = user_facing_error(e)
                 db.commit()
             except Exception as db_err:
                 logger.error(f"Failed to update task {task_id} status: {str(db_err)}")
     finally:
-        if local_path and task and not task.storage_path:
+        # Both sources are temp files on local disk: the direct-upload copy and
+        # the file downloaded from storage. Always remove them.
+        if local_path:
             cleanup_temp_file(local_path)
         db.close()

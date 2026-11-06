@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.chat import Chat, ChatMessage
@@ -25,16 +26,28 @@ def list_chats_for_user(db: Session, user_id: int) -> list[Chat]:
     return db.query(Chat).filter(Chat.user_id == user_id).all()
 
 
-def create_chat(db: Session, user_id: int, name: str) -> Chat:
-    """Create a new chat for a user."""
-    # compute next local_id for this user
-    last = db.query(Chat).filter(Chat.user_id == user_id).order_by(Chat.local_id.desc()).first()
-    next_local = 1 if last is None else (last.local_id + 1)
-    chat = Chat(user_id=user_id, local_id=next_local, name=name)
-    db.add(chat)
-    db.commit()
-    db.refresh(chat)
-    return chat
+def create_chat(db: Session, user_id: int, name: str, max_attempts: int = 3) -> Chat:
+    """Create a new chat for a user.
+
+    local_id is the next number in the user's own sequence. Two concurrent
+    creates can compute the same value; the unique constraint rejects one of
+    them, so retry with a freshly computed local_id.
+    """
+    for attempt in range(max_attempts):
+        last = db.query(Chat).filter(Chat.user_id == user_id).order_by(Chat.local_id.desc()).first()
+        next_local = 1 if last is None else (last.local_id + 1)
+        chat = Chat(user_id=user_id, local_id=next_local, name=name)
+        db.add(chat)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if attempt == max_attempts - 1:
+                raise
+            continue
+        db.refresh(chat)
+        return chat
+    raise RuntimeError("unreachable")
 
 
 def delete_chat(db: Session, chat_id: int, user_id: int) -> bool:

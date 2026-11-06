@@ -1,32 +1,38 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import engine, Base
-from app.routers import documents, chat, auth
-from app.routers import admin
-from app.routers import cron
-from app.routers import health
+from app.database import Base, SessionLocal, engine
+from app.routers import admin, auth, chat, cron, documents, health
+from app.services.task_recovery import fail_interrupted_tasks
 from app.settings import settings
-import os
-import sys
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("app")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("App Starting : Suiiiii")
+    logger.info("Starting Contextra AI backend")
     # Log only whether the key is present, never its value.
-    print("OpenAI API key present:", bool(settings.openai_api_key))
-    # Log common proxy env vars that can interfere with HTTP clients
-    print("HTTP_PROXY:", os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
-    print("HTTPS_PROXY:", os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"))
-    print("ALL_PROXY:", os.environ.get("ALL_PROXY") or os.environ.get("all_proxy"))
+    logger.info("OpenAI API key present: %s", bool(settings.openai_api_key))
     Base.metadata.create_all(bind=engine)
+    try:
+        with SessionLocal() as db:
+            fail_interrupted_tasks(db)
+    except Exception:
+        # Never block startup on housekeeping.
+        logger.exception("Could not recover interrupted tasks")
     yield
 
 
-app = FastAPI(title="Second Brain AI Workspace", lifespan=lifespan)
+app = FastAPI(title="Contextra AI", lifespan=lifespan)
 
 cors_origins = [
     origin.strip().rstrip("/")
@@ -56,4 +62,4 @@ app.include_router(health.router)
 
 @app.get("/")
 def root():
-    return {"message": "Hello from Second Brain AI", "step": 2}
+    return {"message": "Hello from Contextra AI"}

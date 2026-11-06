@@ -13,7 +13,9 @@ def chunk_document(pages_data: list[dict], chunk_size: int = 50) -> list[dict]:
     chunks = []
     
     for page_info in pages_data:
-        text = page_info["text"]
+        text = (page_info.get("text") or "").strip()
+        if not text:
+            continue
         page_num = page_info["page"]
         filename = page_info["filename"]
         

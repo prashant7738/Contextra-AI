@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -31,7 +33,15 @@ from app.repositories import message_repository
 from app.tasks import start_summary_task
 from app.models import SummaryTask
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+def _internal_error(action: str) -> HTTPException:
+    """Log the active exception server-side and return a generic 500 for the client."""
+    logger.exception("Error %s", action)
+    return HTTPException(status_code=500, detail=f"Something went wrong while {action}. Please try again.")
 
 
 @router.get("/{chat_id}/messages", response_model=List[ChatMessageResponse])
@@ -111,11 +121,6 @@ def delete_user_chat(chat_id: int, user_id: int, db: Session = Depends(get_db), 
     """
     if user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: user mismatch")
-    # Log delete attempt for debugging (shows local_id and user)
-    print(f"Attempting delete: chat_id={chat_id}, user_id={user_id}, current_user.id={current_user.id}")
-    # Verify chat exists before deletion to provide clearer logs
-    chat = get_chat(db, chat_id, user_id)
-    print("Found chat for deletion:", bool(chat))
     deleted = delete_chat(db, chat_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Chat not found or doesn't belong to you")
@@ -171,10 +176,12 @@ async def query_chat(user_id: int, query: QueryRequest, db: Session = Depends(ge
             references=[Reference(**ref) for ref in references],
             conversation_history=history_responses,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+    except Exception:
+        raise _internal_error("answering your question")
 
 
 @router.post("/detailed-summarizer", response_model=DetailedSummaryResponse)
@@ -235,8 +242,8 @@ async def detailed_summarizer(user_id: int, payload: DetailedSummaryRequest, db:
         raise HTTPException(status_code=422, detail=str(exc))
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error generating summary: {str(exc)}")
+    except Exception:
+        raise _internal_error("generating the summary")
 
 
 @router.post("/flashcard", response_model=FlashcardResponse)
@@ -305,8 +312,8 @@ async def generate_flashcard(user_id: int, chat_id: int, payload: Optional[Flash
         raise HTTPException(status_code=422, detail=str(exc))
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(exc)}")
+    except Exception:
+        raise _internal_error("generating flashcards")
 
 
 @router.post("/summary-task")

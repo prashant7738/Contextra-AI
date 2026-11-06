@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import threading
 import uuid
 from sqlalchemy import func
@@ -7,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.summary_task import SummaryTask
 from app.services.retrieval_service import answer_query, generate_detailed_summary
-from app.services.chat_service import get_chat
 from app.repositories.chat_repository import get_chat_by_id
+from app.services.background_ingestion import user_facing_error
+
+logger = logging.getLogger(__name__)
 
 
 def start_summary_task(db: Session, params: dict) -> str:
@@ -49,15 +52,17 @@ def _run_summary_task_sync(task_id: str, params: dict):
 
         asyncio.run(_run_summary_task_async(task_id, params, db))
     except Exception as e:
+        logger.exception("Summary task %s failed", task_id)
         try:
+            db.rollback()
             task = db.query(SummaryTask).filter(SummaryTask.id == task_id).first()
             if task:
                 task.status = "error"
-                task.error = str(e)
+                task.error = user_facing_error(e)
                 task.completed_at = func.now()
                 db.commit()
         except Exception as db_err:
-            print("Failed to save error status to database:", db_err)
+            logger.error("Failed to save error status for summary task %s: %s", task_id, db_err)
     finally:
         db.close()
 
